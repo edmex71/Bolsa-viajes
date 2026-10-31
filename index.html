@@ -100,13 +100,22 @@ const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const ESTADOS=['Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua','Ciudad de México','Coahuila','Colima','Durango','Estado de México','Guanajuato','Guerrero','Hidalgo','Jalisco','Michoacán','Morelos','Nayarit','Nuevo León','Oaxaca','Puebla','Querétaro','Quintana Roo','San Luis Potosí','Sinaloa','Sonora','Tabasco','Tamaulipas','Tlaxcala','Veracruz','Yucatán','Zacatecas'];
 const CAJAS=[['seca','Caja seca'],['cerrada','Cerrada'],['termo','Refrigerada (termo)'],['plataforma','Plataforma'],['lowboy','Lowboy']];
 const CAJA_N=Object.fromEntries(CAJAS);
-const MEDIDAS_BASE=['53','48','40'];
-function medidasPara(cajas){return (cajas||[]).some(c=>c==='seca'||c==='termo')?['53','48']:MEDIDAS_BASE}
+/* medida (pies): el Tracto puede ser 53, 48, 45 o 40; las demás unidades (torton, camionetas, rabón…) no pueden ser 48 ni 53 */
+const MEDIDAS_TRACTO=['53','48','45','40'];
+function medidasPara(unidades){
+  const u=unidades||[];
+  return (!u.length||u.includes('Tracto'))?MEDIDAS_TRACTO:MEDIDAS_TRACTO.filter(m=>m!=='53'&&m!=='48');
+}
+const medidaMala=r=>[48,53].includes(Number(r.medida_pies))&&(r.unidades||[]).length>0&&!(r.unidades||[]).includes('Tracto');
+function optsMedida(unidades,actual){
+  const L=medidasPara(unidades).slice();const a=actual==null?'':String(actual);
+  if(a&&!L.includes(a))L.push(a);
+  return '<option value="">—</option>'+L.map(m=>`<option value="${m}" ${a===m?'selected':''}>${m} pies</option>`).join('');
+}
 function pintaMedidas(form){
   const s=form.querySelector('select[name="medida_pies"]');if(!s)return;
-  const cur=s.value,L=medidasPara(vals(form,'cajas'));
-  s.innerHTML='<option value="">—</option>'+L.map(m=>`<option value="${m}">${m} pies</option>`).join('');
-  if(L.includes(cur))s.value=cur;
+  const un=vals(form,'unidades');
+  s.innerHTML=optsMedida(un,medidasPara(un).includes(s.value)?s.value:'');
 }
 const PAGOS={'50-50':'50% y 50%','al_descargar':'Al descargar','credito':'A crédito'};
 const EST_INT={interesado:'Interesado',en_revision:'En revisión',aprobado:'Aprobado',asignado:'Asignado',rechazado:'Rechazado'};
@@ -207,7 +216,7 @@ function perfilForm(c,alta){
   <div class="g2"><div><label>Licencia federal (número)</label><input name="licencia_federal" required value="${esc(c.licencia_federal)}"></div>
   <div><label>Vence la licencia</label><input name="licencia_vence" type="date" value="${esc(c.licencia_vence)}"></div></div>
   <label>Unidad(es) que tienes</label>${checks('unidades',S.tipos,c.unidades)}
-  <div class="g2"><div><label>Medida</label><select name="medida_pies"><option value="">—</option>${medidasPara(c.cajas).map(m=>`<option value="${m}" ${c.medida_pies==m?'selected':''}>${m} pies</option>`).join('')}</select></div>
+  <div class="g2"><div><label>Medida</label><select name="medida_pies">${optsMedida(c.unidades,c.medida_pies)}</select></div>
   <div><label>Placas</label><input name="placas" value="${esc(c.placas)}"></div></div>
   <label>Equipo</label>${checks('cajas',CAJAS,c.cajas)}
   <label>Vence el seguro de la unidad</label><input name="seguro_vence" type="date" value="${esc(c.seguro_vence)}">
@@ -260,7 +269,7 @@ function formViaje(){
   <div class="g2"><div><label>Fecha de carga</label><input type="date" name="fecha_carga"></div><div><label>Horario</label><input name="horario_carga" placeholder="9:00 AM"></div></div>
   <label>Unidad (puede ser más de una)</label>${checks('unidades',S.tipos,[])}
   <label>Equipo (puede ser más de uno)</label><div id="cajasBox">${checks('cajas',CAJAS,[])}</div>
-  <div class="g2"><div><label>Medida</label><select name="medida_pies"><option value="">—</option>${MEDIDAS_BASE.map(m=>`<option value="${m}">${m} pies</option>`).join('')}</select></div>
+  <div class="g2"><div><label>Medida</label><select name="medida_pies">${optsMedida([],'')}</select></div>
   <div id="tempBox" hidden><label>Temperatura (°C)</label><input name="temperatura_c" type="number" step="0.5" placeholder="-10"></div></div>
   <div class="g2"><div><label>Peso mínimo (ton)</label><input name="peso_ton_min" type="number" step="0.1"></div><div><label>Peso máximo (ton)</label><input name="peso_ton_max" type="number" step="0.1"></div></div>
   <div class="g2"><div><label>Tarimas</label><input name="tarimas" type="number"></div><div><label>Ida y vuelta</label><select name="ida_y_vuelta"><option value="no">No</option><option value="si">Sí</option></select></div></div>
@@ -326,7 +335,7 @@ function vacio(r,f){
   return r[f]===null||r[f]===undefined||r[f]==='';
 }
 const origenFalta=r=>!r.origen_ciudad||r.origen_ciudad==='Por completar'||r.origen_estado==='Por completar';
-const nFaltan=r=>FALTAN.filter(f=>vacio(r,f)).length+(origenFalta(r)?1:0);
+const nFaltan=r=>FALTAN.filter(f=>vacio(r,f)).length+(origenFalta(r)?1:0)+(medidaMala(r)?1:0);
 const cel=(r,f,inner)=>`<td class="${FALTAN.includes(f)&&vacio(r,f)?'falta':''}">${inner}</td>`;
 const inp=(r,f,type,extra)=>`<input data-cell="${f}" data-id="${r.id}" type="${type}" value="${esc(r[f]??'')}" ${extra||''}>`;
 function sel(r,f,list,blank){
@@ -346,7 +355,7 @@ function filaHtml(r){
   <td>${inp(r,'horario_carga','text')}</td>
   ${cel(r,'unidades',mb('unidades',(r.unidades||[]).join(', ')))}
   ${cel(r,'cajas',mb('cajas',(r.cajas||[]).map(c=>CAJA_N[c]||c).join(', ')))}
-  <td>${sel(r,'medida_pies',medidasPara(r.cajas),'—')}</td>
+  <td class="${medidaMala(r)?'falta':''}">${sel(r,'medida_pies',medidasPara(r.unidades),'—')}</td>
   <td>${inp(r,'temperatura_c','number','step="0.5" '+(termo?'':'disabled'))}</td>
   <td>${inp(r,'peso_ton_min','number','step="0.1"')}</td>
   <td>${inp(r,'peso_ton_max','number','step="0.1"')}</td>
@@ -406,6 +415,7 @@ async function celda(el){
   }catch(err){pintaFila(id);throw err}
   if(f==='forma_pago'||f==='origen_ciudad'||f==='origen_estado'){pintaFila(id);return}
   const td=el.closest('td');if(td&&FALTAN.includes(f))td.classList.toggle('falta',vacio(r,f));
+  if(td&&f==='medida_pies')td.classList.toggle('falta',medidaMala(r));
 }
 
 /* ---------- acciones ---------- */
@@ -432,7 +442,6 @@ const acts={
     const vals=[...document.querySelectorAll('#mmBody [data-mm]:checked')].map(i=>i.value);
     const upd={[S.mm.field]:vals};
     if(S.mm.field==='cajas'&&!vals.includes('termo'))upd.temperatura_c=null;
-    if(S.mm.field==='cajas'&&medidasPara(vals).length===2){const cur=S.rows.find(x=>x.id===S.mm.id)?.medida_pies;if(cur!=null&&![48,53].includes(Number(cur)))upd.medida_pies=null}
     await guardaViaje(S.mm.id,upd);$('#dlgMulti').close();pintaFila(S.mm.id);
   },
   mmCancel:()=>$('#dlgMulti').close(),
@@ -574,7 +583,8 @@ document.addEventListener('click',async e=>{
 });
 document.addEventListener('change',async e=>{
   const s=e.target;
-  if(s.name==='cajas'){const f=s.closest('form');const t=f.querySelector('#tempBox');if(t)t.hidden=!vals(f,'cajas').includes('termo');pintaMedidas(f);return}
+  if(s.name==='cajas'){const f=s.closest('form');const t=f.querySelector('#tempBox');if(t)t.hidden=!vals(f,'cajas').includes('termo');return}
+  if(s.name==='unidades'){pintaMedidas(s.closest('form'));return}
   if(s.name==='forma_pago'){const d=s.closest('form').querySelector('#diasBox');if(d)d.hidden=s.value!=='credito';return}
   if(s.dataset?.cell){try{await celda(s)}catch(err){toast(err.message||'Error',true)}return}
   const k=s.dataset?.chg;if(!k)return;
