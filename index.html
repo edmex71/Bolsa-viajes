@@ -290,12 +290,13 @@ function listaAdmin(data){
   return data.map(v=>{
     const p=one(v.viajes_privado);
     const ints=(v.interesados||[]).map(i=>{
-      const c=i.chofer||{};const ver=one(c.choferes_admin)?.verificacion;
+      const c=i.chofer||{};const ver=one(c.choferes_admin)?.verificacion;const autorizado=ver==='verificado'&&['aprobado','asignado'].includes(i.estado);
       return `<div class="inter"><div class="row sp"><b>${esc(c.nombre)}</b><span class="badge ${ver==='verificado'?'ok':'warn'}">${esc(ver||'pendiente')}</span></div>
       <div class="mut">${esc(c.telefono)} · ${esc([c.ciudad,c.estado].filter(Boolean).join(', '))} · Lic. ${esc(c.licencia_federal)}</div>
       <div class="row" style="margin-top:8px"><select data-chg="intEstado" data-id="${i.id}" data-viaje="${v.id}" style="width:auto">${Object.entries(EST_INT).map(([k,t])=>`<option value="${k}" ${i.estado===k?'selected':''}>${t}</option>`).join('')}</select>
-      <button class="btn sec sm" data-act="wa" data-v="${v.id}" data-tel="${esc(c.telefono)}">WhatsApp</button>
-      <button class="btn sec sm" data-act="img" data-v="${v.id}">Imagen con precio</button></div></div>`;
+      <button class="btn sec sm" data-act="wa" data-v="${v.id}" data-tel="${esc(c.telefono)}" data-ok="${autorizado?1:0}">WhatsApp</button>
+      ${autorizado?`<button class="btn sec sm" data-act="img" data-v="${v.id}" data-ok="1">Imagen con precio</button>`:''}</div>
+      ${autorizado?'':'<div class="mut" style="margin-top:6px">La imagen con precio se habilita cuando el chofer esté <b>verificado</b> y su solicitud <b>aprobada</b>.</div>'}</div>`;
     }).join('');
     return `<div class="card"><div class="row sp"><h3>${esc(dir(v))}</h3></div>
     <div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${esc(pagoTxt(v))} · Ofrecido: <b>${v.precio_ofrecido!=null?'$'+Number(v.precio_ofrecido).toLocaleString('es-MX'):'—'}</b> · Contacto: <b>${esc(p&&p.contacto||'—')}</b> · A cobrar: <b>${p&&p.precio!=null?'$'+Number(p.precio).toLocaleString('es-MX')+' '+esc(p.moneda):'—'}</b></div>
@@ -486,9 +487,9 @@ const acts={
     if(error)throw error;await refresh();
   },
   wa:async b=>{const v=await viajeAdmin(b.dataset.v);let tel=(b.dataset.tel||'').replace(/\D/g,'');if(tel.length===10)tel='52'+tel;
-    const p=one(v.viajes_privado);const txt=lineas(v).map(x=>x[0]+': '+x[1]).join('\n');
+    const p=one(v.viajes_privado);const txt=lineas(v).filter(x=>b.dataset.ok==='1'||x[0]!=='Precio ofrecido').map(x=>x[0]+': '+x[1]).join('\n');
     window.open('https://wa.me/'+tel+'?text='+encodeURIComponent('Hola, te comparto el viaje:\n'+txt),'_blank')},
-  img:async b=>{const v=await viajeAdmin(b.dataset.v);await imagenViaje(v,one(v.viajes_privado))}
+  img:async b=>{if(b.dataset.ok!=='1'){toast('Primero verifica al chofer y aprueba su solicitud',true);return}const v=await viajeAdmin(b.dataset.v);await imagenViaje(v,one(v.viajes_privado))}
 };
 async function viajeAdmin(id){const d=await datosAdmin();return d.find(v=>v.id===id)}
 const changes={
