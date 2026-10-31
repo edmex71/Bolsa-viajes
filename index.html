@@ -98,7 +98,7 @@ const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 const ESTADOS=['Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua','Ciudad de México','Coahuila','Colima','Durango','Estado de México','Guanajuato','Guerrero','Hidalgo','Jalisco','Michoacán','Morelos','Nayarit','Nuevo León','Oaxaca','Puebla','Querétaro','Quintana Roo','San Luis Potosí','Sinaloa','Sonora','Tabasco','Tamaulipas','Tlaxcala','Veracruz','Yucatán','Zacatecas'];
-const CAJAS=[['seca','Caja seca'],['cerrada','Cerrada'],['termo','Termo'],['plana','Plana']];
+const CAJAS=[['seca','Caja seca'],['cerrada','Cerrada'],['termo','Termo'],['plataforma','Plataforma'],['lowboy','Lowboy']];
 const CAJA_N=Object.fromEntries(CAJAS);
 const PAGOS={'50-50':'50% y 50%','al_descargar':'Al descargar','credito':'A crédito'};
 const EST_INT={interesado:'Interesado',en_revision:'En revisión',aprobado:'Aprobado',asignado:'Asignado',rechazado:'Rechazado'};
@@ -117,8 +117,10 @@ function dir(v){return (v.origen_ciudad+', '+v.origen_estado)+' → '+(v.destino
 function pagoTxt(v){if(!v.forma_pago)return 'Por definir';return v.forma_pago==='credito'?('A crédito'+(v.dias_credito?' a '+v.dias_credito+' días':'')):PAGOS[v.forma_pago]}
 function lineas(v){
   const L=[['Ruta',dir(v)],['Carga',fmtFecha(v.fecha_carga)+(v.horario_carga?' · '+v.horario_carga:'')]];
-  const u=[(v.unidades||[]).join(' o '),v.medida_pies?v.medida_pies+' pies':'',(v.cajas||[]).map(c=>CAJA_N[c]||c).join(' o ')].filter(Boolean).join(' · ');
+  const u=(v.unidades||[]).join(' o ');
+  const eq=[(v.cajas||[]).map(c=>CAJA_N[c]||c).join(' o '),v.medida_pies?v.medida_pies+' pies':''].filter(Boolean).join(' · ');
   if(u)L.push(['Unidad',u]);
+  if(eq)L.push(['Equipo',eq]);
   if(v.temperatura_c!=null)L.push(['Temperatura',v.temperatura_c+' °C']);
   const p=[pesoTxt(v),v.tarimas?v.tarimas+' tarimas':''].filter(Boolean).join(' · ');
   if(p)L.push(['Peso',p]);
@@ -134,7 +136,7 @@ function vals(f,name){return [...f.querySelectorAll(`input[name="${name}"]:check
 function opts(list,sel,blank){return (blank?`<option value="">${esc(blank)}</option>`:'')+list.map(x=>`<option ${x===sel?'selected':''}>${esc(x)}</option>`).join('')}
 
 /* ---------- datos ---------- */
-async function cargarTipos(){const {data}=await sb.from('tipos_unidad').select('nombre').order('nombre');S.tipos=(data||[]).map(x=>x.nombre)}
+async function cargarTipos(){const {data}=await sb.from('tipos_unidad').select('nombre').eq('activo',true).order('nombre');S.tipos=(data||[]).map(x=>x.nombre)}
 async function cargarViajes(){const {data}=await sb.from('viajes').select('*').order('fecha_carga',{ascending:true,nullsFirst:false});S.viajes=data||[]}
 async function refresh(){
   const {data:{session}}=await sb.auth.getSession();
@@ -199,7 +201,7 @@ function perfilForm(c,alta){
   <label>Unidad(es) que tienes</label>${checks('unidades',S.tipos,c.unidades)}
   <div class="g2"><div><label>Medida</label><select name="medida_pies"><option value="">—</option>${[53,48,40,35].map(m=>`<option value="${m}" ${c.medida_pies==m?'selected':''}>${m} pies</option>`).join('')}</select></div>
   <div><label>Placas</label><input name="placas" value="${esc(c.placas)}"></div></div>
-  <label>Tipo de caja</label>${checks('cajas',CAJAS,c.cajas)}
+  <label>Equipo</label>${checks('cajas',CAJAS,c.cajas)}
   <label>Vence el seguro de la unidad</label><input name="seguro_vence" type="date" value="${esc(c.seguro_vence)}">
   <h2>Datos para depósito</h2>
   <div class="g2"><div><label>Banco</label><input name="banco" value="${esc(c.banco)}"></div>
@@ -249,7 +251,7 @@ function formViaje(){
   <div class="g2"><div><label>Destino: ciudad</label><input name="destino_ciudad"></div><div><label>Destino: estado</label><select name="destino_estado">${opts(ESTADOS,'', 'Elige…')}</select></div></div>
   <div class="g2"><div><label>Fecha de carga</label><input type="date" name="fecha_carga"></div><div><label>Horario</label><input name="horario_carga" placeholder="9:00 AM"></div></div>
   <label>Unidad (puede ser más de una)</label>${checks('unidades',S.tipos,[])}
-  <label>Tipo de caja (puede ser más de una)</label><div id="cajasBox">${checks('cajas',CAJAS,[])}</div>
+  <label>Equipo (puede ser más de uno)</label><div id="cajasBox">${checks('cajas',CAJAS,[])}</div>
   <div class="g2"><div><label>Medida</label><select name="medida_pies"><option value="">—</option><option>53</option><option>48</option><option>40</option></select></div>
   <div id="tempBox" hidden><label>Temperatura (°C)</label><input name="temperatura_c" type="number" step="0.5" placeholder="-10"></div></div>
   <div class="g2"><div><label>Peso mínimo (ton)</label><input name="peso_ton_min" type="number" step="0.1"></div><div><label>Peso máximo (ton)</label><input name="peso_ton_max" type="number" step="0.1"></div></div>
@@ -329,8 +331,8 @@ function filaHtml(r){
   ${cel(r,'fecha_carga',inp(r,'fecha_carga','date'))}
   <td>${inp(r,'horario_carga','text')}</td>
   ${cel(r,'unidades',mb('unidades',(r.unidades||[]).join(', ')))}
-  <td>${sel(r,'medida_pies',['53','48','40','35'],'—')}</td>
   ${cel(r,'cajas',mb('cajas',(r.cajas||[]).map(c=>CAJA_N[c]||c).join(', ')))}
+  <td>${sel(r,'medida_pies',['53','48','40','35'],'—')}</td>
   <td>${inp(r,'temperatura_c','number','step="0.5" '+(termo?'':'disabled'))}</td>
   <td>${inp(r,'peso_ton_min','number','step="0.1"')}</td>
   <td>${inp(r,'peso_ton_max','number','step="0.1"')}</td>
@@ -351,7 +353,7 @@ async function vistaTabla(){
   S.rows=(data||[]).map(r=>({...r,precio:one(r.viajes_privado)?.precio??null}));
   const falt=S.rows.filter(r=>nFaltan(r)>0).length;
   const lista=S.soloFaltan?S.rows.filter(r=>nFaltan(r)>0):S.rows;
-  const heads=['Origen: ciudad','Origen: estado','Destino: ciudad','Destino: estado','Fecha de carga','Horario','Unidad','Medida (pies)','Caja','Temp. °C','Peso mín (ton)','Peso máx (ton)','Tarimas','Mercancía','Ida y vuelta','Requerimientos','Notas','Forma de pago','Días crédito','Precio','Estado',''];
+  const heads=['Origen: ciudad','Origen: estado','Destino: ciudad','Destino: estado','Fecha de carga','Horario','Unidad','Equipo','Medida (pies)','Temp. °C','Peso mín (ton)','Peso máx (ton)','Tarimas','Mercancía','Ida y vuelta','Requerimientos','Notas','Forma de pago','Días crédito','Precio','Estado',''];
   return `<div class="row sp"><button class="btn sm" data-act="filaNueva">+ Agregar viaje</button>
   <label class="row" style="margin:0;color:var(--tx)"><input type="checkbox" data-chg="soloFaltan" style="width:auto" ${S.soloFaltan?'checked':''}> Solo con datos faltantes</label></div>
   <p class="mut">${S.rows.length} viajes · ${falt} con datos por completar (celdas amarillas). Cada cambio se guarda solo al salir de la celda. Desliza hacia los lados para ver todas las columnas.</p>
@@ -405,7 +407,7 @@ const acts={
   multi:b=>{
     const r=S.rows.find(x=>x.id===b.dataset.id),f=b.dataset.field;if(!r)return;
     const lista=f==='unidades'?S.tipos.map(t=>[t,t]):CAJAS;
-    $('#mmTitle').textContent=f==='unidades'?'Unidad (puede ser más de una)':'Tipo de caja (puede ser más de una)';
+    $('#mmTitle').textContent=f==='unidades'?'Unidad (puede ser más de una)':'Equipo (puede ser más de uno)';
     $('#mmBody').innerHTML=lista.map(([v,l])=>`<label><input type="checkbox" data-mm value="${esc(v)}" ${(r[f]||[]).includes(v)?'checked':''}>${esc(l)}</label>`).join('');
     S.mm={id:r.id,field:f};$('#dlgMulti').showModal();
   },
