@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bolsa de viajes · Transporte D'Leon</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--tx:#14181f;--mut:#667085;--bd:#e1e5ea;--pri:#0b5ed7;--pri-tx:#fff;--ok:#16794c;--warn:#b54708;--bad:#b42318;--soft:#eef3fc}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1116;--card:#171b22;--tx:#eceff4;--mut:#9aa4b2;--bd:#2a313c;--pri:#4c8dff;--pri-tx:#06101f;--ok:#4cc38a;--warn:#f0a65b;--bad:#ff7b72;--soft:#1b2433}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--bd);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+header h1{font-size:17px;margin:0;line-height:1.2}
+header small{display:block;color:var(--mut);font-weight:400;font-size:12px}
+nav{display:flex;gap:6px;padding:8px 16px;overflow-x:auto;background:var(--card);border-bottom:1px solid var(--bd)}
+nav.sub{background:var(--bg)}
+nav button{flex:none;border:1px solid var(--bd);background:var(--card);color:var(--tx);padding:8px 14px;border-radius:999px;font:inherit;font-size:14px}
+nav button.on{background:var(--pri);border-color:var(--pri);color:var(--pri-tx)}
+main{padding:14px 16px 80px;max-width:760px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:12px}
+.card h3{margin:0 0 4px;font-size:17px}
+.mut{color:var(--mut);font-size:14px}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.tag{background:var(--soft);border-radius:8px;padding:3px 9px;font-size:13px}
+.badge{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;border:1px solid var(--bd)}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.btn{border:0;background:var(--pri);color:var(--pri-tx);padding:11px 16px;border-radius:10px;font:inherit;font-weight:600;cursor:pointer}
+.btn.sec{background:transparent;color:var(--pri);border:1px solid var(--pri)}
+.btn.sm{padding:7px 11px;font-size:14px}
+.btn.full{width:100%}
+.btn:disabled{opacity:.55}
+label{display:block;font-size:14px;margin:10px 0 4px;color:var(--mut)}
+input,select,textarea{width:100%;padding:10px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--tx);font:inherit}
+textarea{min-height:70px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.checks{display:flex;flex-wrap:wrap;gap:6px}
+.checks label{display:flex;align-items:center;gap:6px;margin:0;color:var(--tx);border:1px solid var(--bd);border-radius:999px;padding:6px 12px;width:auto;font-size:14px}
+.checks input{width:auto}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sp{justify-content:space-between}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}
+.stat{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px}
+.stat b{display:block;font-size:26px}
+.inter{border-top:1px solid var(--bd);padding-top:10px;margin-top:10px}
+h2{font-size:19px;margin:18px 0 8px}
+dialog{border:1px solid var(--bd);border-radius:16px;background:var(--card);color:var(--tx);width:min(92vw,400px);padding:18px}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:90vw;display:none;z-index:20}
+#toast.bad{background:#b42318}
+.empty{text-align:center;color:var(--mut);padding:30px 10px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Bolsa de viajes<small>Transporte D'Leon</small></h1>
+  <div id="hdr"></div>
+</header>
+<nav id="nav"></nav>
+<nav id="subnav" class="sub" hidden></nav>
+<main id="app"><p class="empty">Cargando…</p></main>
+
+<dialog id="dlg">
+  <form id="fAuth" data-form="auth">
+    <h3 id="authTitle" style="margin:0 0 6px">Entrar</h3>
+    <p class="mut" id="authHint" style="margin:0 0 6px">Entra con tu correo para registrarte en un viaje.</p>
+    <label>Correo</label><input type="email" name="email" required autocomplete="email">
+    <label>Contraseña (mínimo 8 caracteres)</label><input type="password" name="password" required minlength="8" autocomplete="current-password">
+    <div class="row" style="margin-top:14px">
+      <button class="btn" id="authBtn" type="submit">Entrar</button>
+      <button class="btn sec" type="button" data-act="toggleAuth" id="authToggle">Crear cuenta</button>
+      <button class="btn sec" type="button" data-act="cerrar">Cancelar</button>
+    </div>
+  </form>
+</dialog>
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
+const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+const ESTADOS=['Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua','Ciudad de México','Coahuila','Colima','Durango','Estado de México','Guanajuato','Guerrero','Hidalgo','Jalisco','Michoacán','Morelos','Nayarit','Nuevo León','Oaxaca','Puebla','Querétaro','Quintana Roo','San Luis Potosí','Sinaloa','Sonora','Tabasco','Tamaulipas','Tlaxcala','Veracruz','Yucatán','Zacatecas'];
+const CAJAS=[['seca','Caja seca'],['cerrada','Cerrada'],['termo','Termo'],['plana','Plana']];
+const CAJA_N=Object.fromEntries(CAJAS);
+const PAGOS={'50-50':'50% y 50%','al_descargar':'Al descargar','credito':'A crédito'};
+const EST_INT={interesado:'Interesado',en_revision:'En revisión',aprobado:'Aprobado',asignado:'Asignado',rechazado:'Rechazado'};
+const S={user:null,admin:false,chofer:null,tipos:[],viajes:[],mine:new Set(),view:'viajes',sub:'resumen',pending:null,fOrigen:'',fUnidad:'',authMode:'login',q:'',nuevoChofer:false};
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const nn=v=>{v=(v??'').toString().trim();return v===''?null:v};
+const num=v=>{v=nn(v);return v===null?null:Number(v)};
+const hoy=()=>new Date().toLocaleDateString('en-CA',{timeZone:'America/Mexico_City'});
+function toast(m,bad){const t=$('#toast');t.textContent=m;t.className=bad?'bad':'';t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',4200)}
+function fmtFecha(f){if(!f)return 'Fecha por definir';return new Date(f+'T12:00:00').toLocaleDateString('es-MX',{weekday:'short',day:'numeric',month:'short'})}
+function pesoTxt(v){const a=v.peso_ton_min,b=v.peso_ton_max;if(a==null&&b==null)return '';if(a!=null&&b!=null&&a!==b)return a+'–'+b+' ton';return (a??b)+' ton'}
+function one(x){return Array.isArray(x)?x[0]:x}
+function dir(v){return (v.origen_ciudad+', '+v.origen_estado)+' → '+(v.destino_ciudad?v.destino_ciudad+(v.destino_estado?', '+v.destino_estado:''):'Servicio local / por definir')}
+function pagoTxt(v){return v.forma_pago==='credito'?('A crédito'+(v.dias_credito?' a '+v.dias_credito+' días':'')):PAGOS[v.forma_pago]}
+function lineas(v){
+  const L=[['Ruta',dir(v)],['Carga',fmtFecha(v.fecha_carga)+(v.horario_carga?' · '+v.horario_carga:'')]];
+  const u=[(v.unidades||[]).join(' o '),v.medida_pies?v.medida_pies+' pies':'',(v.cajas||[]).map(c=>CAJA_N[c]||c).join(' o ')].filter(Boolean).join(' · ');
+  if(u)L.push(['Unidad',u]);
+  if(v.temperatura_c!=null)L.push(['Temperatura',v.temperatura_c+' °C']);
+  const p=[pesoTxt(v),v.tarimas?v.tarimas+' tarimas':''].filter(Boolean).join(' · ');
+  if(p)L.push(['Peso',p]);
+  if(v.descripcion_carga)L.push(['Mercancía',v.descripcion_carga]);
+  if(v.ida_y_vuelta)L.push(['Viaje','Ida y vuelta']);
+  if(v.requerimientos)L.push(['Requisitos',v.requerimientos]);
+  if(v.notas)L.push(['Notas',v.notas]);
+  L.push(['Pago',pagoTxt(v)]);
+  return L;
+}
+function checks(name,opts,sel){return '<div class="checks">'+opts.map(o=>{const [val,lab]=Array.isArray(o)?o:[o,o];return `<label><input type="checkbox" name="${name}" value="${esc(val)}" ${(sel||[]).includes(val)?'checked':''}>${esc(lab)}</label>`}).join('')+'</div>'}
+function vals(f,name){return [...f.querySelectorAll(`input[name="${name}"]:checked`)].map(i=>i.value)}
+function opts(list,sel,blank){return (blank?`<option value="">${esc(blank)}</option>`:'')+list.map(x=>`<option ${x===sel?'selected':''}>${esc(x)}</option>`).join('')}
+
+/* ---------- datos ---------- */
+async function cargarTipos(){const {data}=await sb.from('tipos_unidad').select('nombre').order('nombre');S.tipos=(data||[]).map(x=>x.nombre)}
+async function cargarViajes(){const {data}=await sb.from('viajes').select('*').order('fecha_carga',{ascending:true,nullsFirst:false});S.viajes=data||[]}
+async function refresh(){
+  const {data:{session}}=await sb.auth.getSession();
+  S.user=session?.user||null;S.admin=false;S.chofer=null;S.mine=new Set();
+  if(S.user){
+    const a=await sb.from('admins').select('user_id').eq('user_id',S.user.id).maybeSingle();
+    S.admin=!!a.data;
+    const c=await sb.from('choferes').select('*').eq('user_id',S.user.id).maybeSingle();
+    S.chofer=c.data||null;
+    if(S.chofer){const i=await sb.from('interesados').select('viaje_id').eq('chofer_id',S.chofer.id);S.mine=new Set((i.data||[]).map(x=>x.viaje_id))}
+  }
+  await cargarViajes();
+  await render();
+}
+
+/* ---------- vistas ---------- */
+async function render(){
+  $('#hdr').innerHTML=S.user?`<button class="btn sec sm" data-act="logout">Salir</button>`:`<button class="btn sm" data-act="login">Entrar</button>`;
+  const tabs=[['viajes','Viajes']];
+  if(S.user)tabs.push(['perfil','Mi perfil']);
+  if(S.admin)tabs.push(['admin','Administrador']);
+  if(!tabs.some(t=>t[0]===S.view))S.view='viajes';
+  $('#nav').innerHTML=tabs.map(t=>`<button class="${S.view===t[0]?'on':''}" data-act="tab" data-v="${t[0]}">${t[1]}</button>`).join('');
+  const sn=$('#subnav');
+  if(S.view==='admin'&&S.admin){
+    sn.hidden=false;
+    sn.innerHTML=[['resumen','Resumen'],['publicar','Publicar viaje'],['viajes','Viajes y precios'],['choferes','Choferes']].map(t=>`<button class="${S.sub===t[0]?'on':''}" data-act="sub" data-v="${t[0]}">${t[1]}</button>`).join('');
+  }else sn.hidden=true;
+  const app=$('#app');
+  try{
+    if(S.view==='viajes')app.innerHTML=vistaViajes();
+    else if(S.view==='perfil')app.innerHTML=vistaPerfil();
+    else if(S.view==='admin'){app.innerHTML='<p class="empty">Cargando…</p>';app.innerHTML=await vistaAdmin()}
+  }catch(e){app.innerHTML=`<p class="empty bad">Error: ${esc(e.message)}</p>`}
+}
+
+function vistaViajes(){
+  const pub=S.viajes.filter(v=>v.estado==='disponible');
+  const origenes=[...new Set(pub.map(v=>v.origen_estado))].sort();
+  let list=pub.filter(v=>(!S.fOrigen||v.origen_estado===S.fOrigen)&&(!S.fUnidad||(v.unidades||[]).includes(S.fUnidad)));
+  let h=`<div class="g2"><div><label>Sale de (estado)</label><select data-chg="fOrigen">${opts(origenes,S.fOrigen,'Todos')}</select></div>
+  <div><label>Tipo de unidad</label><select data-chg="fUnidad">${opts(S.tipos,S.fUnidad,'Todas')}</select></div></div><div style="height:12px"></div>`;
+  if(!list.length)return h+'<p class="empty">No hay viajes disponibles por ahora.</p>';
+  return h+list.map(cardViaje).join('');
+}
+function cardViaje(v){
+  const L=lineas(v);const ya=S.mine.has(v.id);
+  return `<div class="card"><h3>${esc(dir(v))}</h3><div class="mut">${esc(fmtFecha(v.fecha_carga))}${v.horario_carga?' · '+esc(v.horario_carga):''}</div>
+  <div class="tags">${L.filter(x=>!['Ruta','Carga'].includes(x[0])).map(x=>`<span class="tag"><b>${esc(x[0])}:</b> ${esc(x[1])}</span>`).join('')}</div>
+  <button class="btn full" data-act="interes" data-id="${v.id}" ${ya?'disabled':''}>${ya?'Ya te registraste en este viaje':'Me interesa'}</button></div>`;
+}
+
+function perfilForm(c,alta){
+  c=c||{};
+  return `<form data-form="${alta?'alta':'perfil'}">
+  <label>Nombre completo</label><input name="nombre" required value="${esc(c.nombre)}">
+  <div class="g2"><div><label>Teléfono / WhatsApp</label><input name="telefono" type="tel" required value="${esc(c.telefono)}"></div>
+  <div><label>Ciudad donde estás</label><input name="ciudad" value="${esc(c.ciudad)}"></div></div>
+  <label>Estado donde estás</label><select name="estado">${opts(ESTADOS,c.estado,'Elige…')}</select>
+  <div class="g2"><div><label>Licencia federal (número)</label><input name="licencia_federal" required value="${esc(c.licencia_federal)}"></div>
+  <div><label>Vence la licencia</label><input name="licencia_vence" type="date" value="${esc(c.licencia_vence)}"></div></div>
+  <label>Unidad(es) que tienes</label>${checks('unidades',S.tipos,c.unidades)}
+  <div class="g2"><div><label>Medida</label><select name="medida_pies"><option value="">—</option>${[53,48,40,35].map(m=>`<option value="${m}" ${c.medida_pies==m?'selected':''}>${m} pies</option>`).join('')}</select></div>
+  <div><label>Placas</label><input name="placas" value="${esc(c.placas)}"></div></div>
+  <label>Tipo de caja</label>${checks('cajas',CAJAS,c.cajas)}
+  <label>Vence el seguro de la unidad</label><input name="seguro_vence" type="date" value="${esc(c.seguro_vence)}">
+  <h2>Datos para depósito</h2>
+  <div class="g2"><div><label>Banco</label><input name="banco" value="${esc(c.banco)}"></div>
+  <div><label>Titular de la cuenta</label><input name="titular" value="${esc(c.titular)}"></div></div>
+  <label>CLABE (18 dígitos)</label><input name="clabe" inputmode="numeric" maxlength="18" value="${esc(c.clabe)}">
+  ${alta?`<label class="row" style="color:var(--tx)"><input type="checkbox" name="verif" style="width:auto"> Ya lo verifiqué personalmente</label>`:''}
+  <p class="mut">Tu licencia, tarjeta de circulación y seguro te los pedirá el administrador por WhatsApp.</p>
+  <button class="btn full" type="submit">${alta?'Dar de alta chofer':'Guardar mi perfil'}</button></form>`;
+}
+function vistaPerfil(){
+  return `<div class="card"><h3>Mi perfil de chofer</h3><p class="mut">${S.chofer?'Tus datos solo los ves tú y el administrador.':'Completa tus datos una sola vez. Con ellos podrás registrarte en los viajes.'}</p>${perfilForm(S.chofer,false)}</div>`;
+}
+
+/* ---------- administrador ---------- */
+async function datosAdmin(){
+  const v=await sb.from('viajes').select('*, viajes_privado(precio,moneda), interesados(id,estado,created_at, chofer:choferes(id,nombre,telefono,ciudad,estado,licencia_federal, choferes_admin(verificacion)))').order('created_at',{ascending:false});
+  if(v.error)throw v.error;return v.data||[];
+}
+async function vistaAdmin(){
+  if(S.sub==='publicar')return formViaje();
+  if(S.sub==='choferes')return await vistaChoferes();
+  const data=await datosAdmin();
+  if(S.sub==='viajes')return listaAdmin(data);
+  return await resumen(data);
+}
+async function resumen(data){
+  const h=hoy();const lim=new Date(h+'T12:00:00');lim.setDate(lim.getDate()+30);const l30=lim.toISOString().slice(0,10);
+  const c=await sb.from('choferes').select('id,nombre,licencia_vence,seguro_vence, choferes_admin(verificacion)');
+  const ch=c.data||[];
+  const vig=data.filter(v=>v.estado==='disponible'&&(!v.fecha_carga||v.fecha_carga>=h));
+  const tom=data.filter(v=>v.estado==='asignado');
+  const pend=ch.filter(x=>one(x.choferes_admin)?.verificacion==='pendiente');
+  const venc=ch.filter(x=>(x.licencia_vence&&x.licencia_vence<=l30)||(x.seguro_vence&&x.seguro_vence<=l30));
+  const nInt=v=>(v.interesados||[]).filter(i=>i.estado!=='rechazado').length;
+  let o=`<div class="stats"><div class="stat"><b>${vig.length}</b>Vigentes</div><div class="stat"><b>${tom.length}</b>Tomados</div>
+  <div class="stat"><b>${pend.length}</b>Choferes por verificar</div><div class="stat"><b>${venc.length}</b>Documentos por vencer</div></div>`;
+  o+='<h2>Viajes vigentes</h2>'+(vig.length?vig.map(v=>`<div class="card"><b>${esc(dir(v))}</b><div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${nInt(v)} interesado(s)</div></div>`).join(''):'<p class="empty">Ninguno.</p>');
+  o+='<h2>Viajes tomados</h2>'+(tom.length?tom.map(v=>{const a=(v.interesados||[]).find(i=>i.estado==='asignado');return `<div class="card"><b>${esc(dir(v))}</b><div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${a?esc(a.chofer?.nombre):'sin chofer registrado'}</div></div>`}).join(''):'<p class="empty">Ninguno.</p>');
+  if(pend.length)o+='<h2>Por verificar</h2>'+pend.map(x=>`<div class="card">${esc(x.nombre)}</div>`).join('');
+  if(venc.length)o+='<h2>Por vencer (30 días)</h2>'+venc.map(x=>`<div class="card"><b>${esc(x.nombre)}</b><div class="mut">Licencia: ${esc(x.licencia_vence||'—')} · Seguro: ${esc(x.seguro_vence||'—')}</div></div>`).join('');
+  return o;
+}
+function formViaje(){
+  return `<div class="card"><h3>Publicar viaje</h3><form data-form="viaje">
+  <div class="g2"><div><label>Origen: ciudad</label><input name="origen_ciudad" required></div><div><label>Origen: estado</label><select name="origen_estado" required>${opts(ESTADOS,'', 'Elige…')}</select></div></div>
+  <div class="g2"><div><label>Destino: ciudad</label><input name="destino_ciudad"></div><div><label>Destino: estado</label><select name="destino_estado">${opts(ESTADOS,'', 'Elige…')}</select></div></div>
+  <div class="g2"><div><label>Fecha de carga</label><input type="date" name="fecha_carga"></div><div><label>Horario</label><input name="horario_carga" placeholder="9:00 AM"></div></div>
+  <label>Unidad (puede ser más de una)</label>${checks('unidades',S.tipos,[])}
+  <label>Tipo de caja (puede ser más de una)</label><div id="cajasBox">${checks('cajas',CAJAS,[])}</div>
+  <div class="g2"><div><label>Medida</label><select name="medida_pies"><option value="">—</option><option>53</option><option>48</option><option>40</option></select></div>
+  <div id="tempBox" hidden><label>Temperatura (°C)</label><input name="temperatura_c" type="number" step="0.5" placeholder="-10"></div></div>
+  <div class="g2"><div><label>Peso mínimo (ton)</label><input name="peso_ton_min" type="number" step="0.1"></div><div><label>Peso máximo (ton)</label><input name="peso_ton_max" type="number" step="0.1"></div></div>
+  <div class="g2"><div><label>Tarimas</label><input name="tarimas" type="number"></div><div><label>Ida y vuelta</label><select name="ida_y_vuelta"><option value="no">No</option><option value="si">Sí</option></select></div></div>
+  <label>Mercancía</label><input name="descripcion_carga" placeholder="Congelado, maquinaria…">
+  <label>Requerimientos especiales</label><input name="requerimientos" placeholder="GPS compartido con el cliente…">
+  <label>Notas</label><textarea name="notas"></textarea>
+  <div class="g2"><div><label>Forma de pago</label><select name="forma_pago" required><option value="50-50">50% y 50%</option><option value="al_descargar">Al descargar</option><option value="credito">A crédito</option></select></div>
+  <div id="diasBox" hidden><label>Días de crédito</label><input name="dias_credito" type="number" placeholder="15"></div></div>
+  <label>Precio (solo lo ven los administradores)</label><input name="precio" type="number" step="0.01" placeholder="MXN">
+  <div style="height:14px"></div><button class="btn full" type="submit">Publicar viaje</button></form></div>`;
+}
+function listaAdmin(data){
+  if(!data.length)return '<p class="empty">Todavía no hay viajes.</p>';
+  return data.map(v=>{
+    const p=one(v.viajes_privado);
+    const ints=(v.interesados||[]).map(i=>{
+      const c=i.chofer||{};const ver=one(c.choferes_admin)?.verificacion;
+      return `<div class="inter"><div class="row sp"><b>${esc(c.nombre)}</b><span class="badge ${ver==='verificado'?'ok':'warn'}">${esc(ver||'pendiente')}</span></div>
+      <div class="mut">${esc(c.telefono)} · ${esc([c.ciudad,c.estado].filter(Boolean).join(', '))} · Lic. ${esc(c.licencia_federal)}</div>
+      <div class="row" style="margin-top:8px"><select data-chg="intEstado" data-id="${i.id}" data-viaje="${v.id}" style="width:auto">${Object.entries(EST_INT).map(([k,t])=>`<option value="${k}" ${i.estado===k?'selected':''}>${t}</option>`).join('')}</select>
+      <button class="btn sec sm" data-act="wa" data-v="${v.id}" data-tel="${esc(c.telefono)}">WhatsApp</button>
+      <button class="btn sec sm" data-act="img" data-v="${v.id}">Imagen con precio</button></div></div>`;
+    }).join('');
+    return `<div class="card"><div class="row sp"><h3>${esc(dir(v))}</h3></div>
+    <div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${esc(pagoTxt(v))} · Precio: <b>${p&&p.precio!=null?'$'+Number(p.precio).toLocaleString('es-MX')+' '+esc(p.moneda):'sin precio'}</b></div>
+    <div class="row" style="margin-top:8px"><select data-chg="viajeEstado" data-id="${v.id}" style="width:auto">${['disponible','asignado','cancelado'].map(e=>`<option ${v.estado===e?'selected':''}>${e}</option>`).join('')}</select>
+    <button class="btn sec sm" data-act="delViaje" data-id="${v.id}">Borrar</button></div>
+    ${ints||'<div class="inter mut">Sin interesados todavía.</div>'}</div>`;
+  }).join('');
+}
+async function vistaChoferes(){
+  const {data,error}=await sb.from('choferes').select('*, choferes_admin(*)').order('created_at',{ascending:false});
+  if(error)throw error;
+  const q=S.q.toLowerCase();
+  const list=(data||[]).filter(c=>!q||(c.nombre+' '+c.licencia_federal+' '+c.telefono).toLowerCase().includes(q));
+  let o=`<div class="row sp"><button class="btn sm" data-act="nuevoChofer">${S.nuevoChofer?'Cerrar formulario':'+ Dar de alta chofer'}</button></div>`;
+  if(S.nuevoChofer)o+=`<div class="card" style="margin-top:12px">${perfilForm(null,true)}</div>`;
+  o+=`<label>Buscar</label><input data-inp="q" value="${esc(S.q)}" placeholder="Nombre, teléfono o licencia"><div style="height:12px"></div>`;
+  if(!list.length)return o+'<p class="empty">Sin choferes.</p>';
+  return o+list.map(c=>{
+    const a=one(c.choferes_admin)||{};
+    return `<div class="card"><div class="row sp"><h3>${esc(c.nombre)}</h3><span class="badge ${a.verificacion==='verificado'?'ok':a.verificacion==='rechazado'?'bad':'warn'}">${esc(a.verificacion||'pendiente')}</span></div>
+    <div class="mut">${esc(c.telefono)} · ${esc([c.ciudad,c.estado].filter(Boolean).join(', '))}</div>
+    <div class="tags"><span class="tag">Lic. ${esc(c.licencia_federal)} (vence ${esc(c.licencia_vence||'—')})</span><span class="tag">${esc((c.unidades||[]).join(', ')||'Sin unidad')}${c.medida_pies?' '+c.medida_pies+'\'':''}</span><span class="tag">Placas ${esc(c.placas||'—')}</span><span class="tag">Seguro vence ${esc(c.seguro_vence||'—')}</span></div>
+    <div class="mut">${esc(c.banco||'')} ${esc(c.titular||'')} ${esc(c.clabe||'')}</div>
+    <div class="row" style="margin-top:8px"><select data-chg="verif" data-id="${c.id}" style="width:auto">${['pendiente','verificado','rechazado'].map(e=>`<option ${a.verificacion===e?'selected':''}>${e}</option>`).join('')}</select>
+    <span class="mut">${a.verificado_en?'Verificado el '+esc(a.verificado_en):''}</span></div>
+    <label>Notas tuyas (el chofer no las ve)</label><textarea data-notas="${c.id}">${esc(a.notas||'')}</textarea>
+    <button class="btn sec sm" data-act="guardaNotas" data-id="${c.id}" style="margin-top:6px">Guardar notas</button></div>`;
+  }).join('');
+}
+
+/* ---------- acciones ---------- */
+function abrirAuth(){S.authMode='login';pintaAuth();$('#dlg').showModal()}
+function pintaAuth(){const s=S.authMode==='signup';$('#authTitle').textContent=s?'Crear cuenta':'Entrar';$('#authBtn').textContent=s?'Crear cuenta':'Entrar';$('#authToggle').textContent=s?'Ya tengo cuenta':'Crear cuenta';$('#authHint').textContent=s?'Usa un correo que revises, a veces pedimos confirmarlo.':'Entra con tu correo para registrarte en un viaje.'}
+async function registrarInteres(id){
+  if(!S.user){S.pending=id;abrirAuth();return}
+  if(!S.chofer){S.pending=id;S.view='perfil';await render();toast('Primero completa tu perfil de chofer');return}
+  const {error}=await sb.from('interesados').insert({viaje_id:id,chofer_id:S.chofer.id});
+  if(error){if(error.code==='23505'){toast('Ya estabas registrado en este viaje')}else throw error}
+  else toast('Listo. El administrador te contactará por WhatsApp.');
+  S.mine.add(id);S.pending=null;await render();
+}
+const acts={
+  login:abrirAuth,
+  cerrar:()=>$('#dlg').close(),
+  toggleAuth:()=>{S.authMode=S.authMode==='login'?'signup':'login';pintaAuth()},
+  logout:async()=>{await sb.auth.signOut();S.view='viajes';await refresh()},
+  tab:async b=>{S.view=b.dataset.v;await render()},
+  sub:async b=>{S.sub=b.dataset.v;await render()},
+  interes:b=>registrarInteres(b.dataset.id),
+  nuevoChofer:async()=>{S.nuevoChofer=!S.nuevoChofer;await render()},
+  guardaNotas:async b=>{
+    const t=document.querySelector(`[data-notas="${b.dataset.id}"]`).value;
+    const {error}=await sb.from('choferes_admin').update({notas:nn(t)}).eq('chofer_id',b.dataset.id);
+    toast(error?error.message:'Notas guardadas',!!error);
+  },
+  delViaje:async b=>{
+    if(!confirm('¿Borrar este viaje y sus interesados?'))return;
+    const {error}=await sb.from('viajes').delete().eq('id',b.dataset.id);
+    if(error)throw error;await refresh();
+  },
+  wa:async b=>{const v=await viajeAdmin(b.dataset.v);let tel=(b.dataset.tel||'').replace(/\D/g,'');if(tel.length===10)tel='52'+tel;
+    const p=one(v.viajes_privado);const txt=lineas(v).map(x=>x[0]+': '+x[1]).join('\n')+(p&&p.precio!=null?'\nPrecio: $'+Number(p.precio).toLocaleString('es-MX')+' '+p.moneda:'');
+    window.open('https://wa.me/'+tel+'?text='+encodeURIComponent('Hola, te comparto el viaje:\n'+txt),'_blank')},
+  img:async b=>{const v=await viajeAdmin(b.dataset.v);await imagenViaje(v,one(v.viajes_privado))}
+};
+async function viajeAdmin(id){const d=await datosAdmin();return d.find(v=>v.id===id)}
+const changes={
+  fOrigen:async s=>{S.fOrigen=s.value;await render()},
+  fUnidad:async s=>{S.fUnidad=s.value;await render()},
+  viajeEstado:async s=>{const {error}=await sb.from('viajes').update({estado:s.value}).eq('id',s.dataset.id);if(error)throw error;toast('Estado actualizado');await refresh()},
+  intEstado:async s=>{
+    const {error}=await sb.from('interesados').update({estado:s.value}).eq('id',s.dataset.id);if(error)throw error;
+    if(s.value==='asignado'){const r=await sb.from('viajes').update({estado:'asignado'}).eq('id',s.dataset.viaje);if(r.error)throw r.error}
+    toast('Actualizado');await refresh()},
+  verif:async s=>{
+    const upd={verificacion:s.value,verificado_en:s.value==='verificado'?hoy():null};
+    const {error}=await sb.from('choferes_admin').update(upd).eq('chofer_id',s.dataset.id);if(error)throw error;
+    toast('Actualizado');await render()}
+};
+
+function datosChofer(f){
+  const g=n=>f.elements[n]?.value;
+  const clabe=nn(g('clabe'));
+  if(clabe&&!/^\d{18}$/.test(clabe))throw new Error('La CLABE debe tener 18 dígitos');
+  return {nombre:nn(g('nombre')),telefono:nn(g('telefono')),ciudad:nn(g('ciudad')),estado:nn(g('estado')),
+    licencia_federal:nn(g('licencia_federal'))?.toUpperCase().replace(/\s+/g,''),licencia_vence:nn(g('licencia_vence')),
+    unidades:vals(f,'unidades'),medida_pies:num(g('medida_pies')),cajas:vals(f,'cajas'),placas:nn(g('placas'))?.toUpperCase(),
+    seguro_vence:nn(g('seguro_vence')),banco:nn(g('banco')),titular:nn(g('titular')),clabe};
+}
+const forms={
+  auth:async f=>{
+    const email=f.email.value.trim(),password=f.password.value;
+    if(S.authMode==='signup'){
+      const {data,error}=await sb.auth.signUp({email,password});if(error)throw error;
+      if(!data.session){toast('Te mandamos un correo para confirmar tu cuenta. Después entra aquí.');$('#dlg').close();return}
+    }else{const {error}=await sb.auth.signInWithPassword({email,password});if(error)throw new Error('Correo o contraseña incorrectos')}
+    $('#dlg').close();f.reset();await refresh();
+    if(S.pending&&S.chofer)await registrarInteres(S.pending);
+    else if(S.pending&&!S.chofer){S.view='perfil';await render();toast('Completa tu perfil para registrarte en el viaje')}
+  },
+  perfil:async f=>{
+    const d=datosChofer(f);let r;
+    if(S.chofer)r=await sb.from('choferes').update(d).eq('id',S.chofer.id).select().single();
+    else r=await sb.from('choferes').insert({...d,user_id:S.user.id}).select().single();
+    if(r.error){if(r.error.code==='23505')throw new Error('Esa licencia ya está registrada. Si eres tú, avisa al administrador.');throw r.error}
+    S.chofer=r.data;toast('Perfil guardado');
+    if(S.pending){const id=S.pending;S.view='viajes';await registrarInteres(id)}else await render();
+  },
+  alta:async f=>{
+    const d=datosChofer(f);
+    const r=await sb.from('choferes').insert(d).select().single();
+    if(r.error){if(r.error.code==='23505')throw new Error('Esa licencia ya está registrada');throw r.error}
+    if(f.elements['verif']?.checked){const u=await sb.from('choferes_admin').update({verificacion:'verificado',verificado_en:hoy()}).eq('chofer_id',r.data.id);if(u.error)throw u.error}
+    S.nuevoChofer=false;toast('Chofer dado de alta');await render();
+  },
+  viaje:async f=>{
+    const g=n=>f.elements[n]?.value;const cajas=vals(f,'cajas');
+    const fp=g('forma_pago');
+    const row={origen_ciudad:nn(g('origen_ciudad')),origen_estado:g('origen_estado'),destino_ciudad:nn(g('destino_ciudad')),destino_estado:nn(g('destino_estado')),
+      fecha_carga:nn(g('fecha_carga')),horario_carga:nn(g('horario_carga')),unidades:vals(f,'unidades'),cajas,medida_pies:num(g('medida_pies')),
+      temperatura_c:cajas.includes('termo')?num(g('temperatura_c')):null,peso_ton_min:num(g('peso_ton_min')),peso_ton_max:num(g('peso_ton_max')),
+      tarimas:num(g('tarimas')),descripcion_carga:nn(g('descripcion_carga')),ida_y_vuelta:g('ida_y_vuelta')==='si',requerimientos:nn(g('requerimientos')),
+      notas:nn(g('notas')),forma_pago:fp,dias_credito:fp==='credito'?num(g('dias_credito')):null};
+    const r=await sb.from('viajes').insert(row).select('id').single();if(r.error)throw r.error;
+    const precio=num(g('precio'));
+    if(precio!==null){const p=await sb.from('viajes_privado').insert({viaje_id:r.data.id,precio});if(p.error)throw p.error}
+    toast('Viaje publicado');S.sub='viajes';await refresh();
+  }
+};
+
+/* ---------- imagen para WhatsApp ---------- */
+async function imagenViaje(v,p){
+  const c=document.createElement('canvas');c.width=1080;c.height=1350;const x=c.getContext('2d');
+  x.fillStyle='#fff';x.fillRect(0,0,1080,1350);x.fillStyle='#0b5ed7';x.fillRect(0,0,1080,150);
+  x.fillStyle='#fff';x.font='bold 56px sans-serif';x.fillText("Transporte D'Leon",50,96);
+  let y=230;
+  const wrap=(t,w)=>{const out=[];let ln='';for(const wd of String(t).split(' ')){const test=ln?ln+' '+wd:wd;if(x.measureText(test).width>w&&ln){out.push(ln);ln=wd}else ln=test}if(ln)out.push(ln);return out};
+  for(const [k,val] of lineas(v)){
+    x.fillStyle='#667085';x.font='34px sans-serif';x.fillText(k.toUpperCase(),50,y);y+=46;
+    x.fillStyle='#14181f';x.font='bold 42px sans-serif';
+    for(const ln of wrap(val,980)){x.fillText(ln,50,y);y+=54}
+    y+=22;if(y>1150)break;
+  }
+  if(p&&p.precio!=null){x.fillStyle='#16794c';x.fillRect(0,1190,1080,160);x.fillStyle='#fff';x.font='bold 74px sans-serif';
+    x.fillText('$'+Number(p.precio).toLocaleString('es-MX')+' '+p.moneda,50,1295)}
+  const blob=await new Promise(r=>c.toBlob(r,'image/png'));
+  const file=new File([blob],'viaje.png',{type:'image/png'});
+  try{
+    if(navigator.canShare&&navigator.canShare({files:[file]}))await navigator.share({files:[file]});
+    else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='viaje.png';a.click()}
+  }catch(e){if(e.name!=='AbortError')throw e}
+}
+
+/* ---------- eventos ---------- */
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;
+  try{await acts[b.dataset.act]?.(b)}catch(err){toast(err.message||'Error',true)}
+});
+document.addEventListener('change',async e=>{
+  const s=e.target;
+  if(s.name==='cajas'){const f=s.closest('form');const t=f.querySelector('#tempBox');if(t)t.hidden=!vals(f,'cajas').includes('termo');return}
+  if(s.name==='forma_pago'){const d=s.closest('form').querySelector('#diasBox');if(d)d.hidden=s.value!=='credito';return}
+  const k=s.dataset?.chg;if(!k)return;
+  try{await changes[k](s)}catch(err){toast(err.message||'Error',true)}
+});
+document.addEventListener('input',e=>{
+  if(e.target.dataset?.inp==='q'){S.q=e.target.value;clearTimeout(S.qt);S.qt=setTimeout(async()=>{await render();const i=document.querySelector('[data-inp="q"]');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}},350)}
+});
+document.addEventListener('submit',async e=>{
+  const f=e.target.closest('form[data-form]');if(!f)return;e.preventDefault();
+  const btn=f.querySelector('button[type=submit]');if(btn)btn.disabled=true;
+  try{await forms[f.dataset.form](f)}catch(err){toast(err.message||'Error',true)}
+  if(btn)btn.disabled=false;
+});
+
+(async()=>{
+  sb.auth.onAuthStateChange((ev)=>{if(ev==='SIGNED_OUT')refresh()});
+  await cargarTipos();await refresh();
+})();
+</script>
+</body>
+</html>
