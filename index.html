@@ -145,6 +145,7 @@ function lineas(v){
   if(v.ida_y_vuelta)L.push(['Viaje','Ida y vuelta']);
   if(v.requerimientos)L.push(['Requisitos',v.requerimientos]);
   if(v.notas)L.push(['Notas',v.notas]);
+  if(v.precio_ofrecido!=null)L.push(['Precio ofrecido','$'+Number(v.precio_ofrecido).toLocaleString('es-MX')+' MXN']);
   L.push(['Pago',pagoTxt(v)]);
   return L;
 }
@@ -279,7 +280,8 @@ function formViaje(){
   <label class="row" style="color:var(--tx)"><input type="checkbox" name="permitir_repetido" style="width:auto"> Es otro viaje distinto aunque la ruta y la fecha sean iguales</label>
   <div class="g2"><div><label>Forma de pago</label><select name="forma_pago"><option value="">Por definir</option><option value="50-50">50% y 50%</option><option value="al_descargar">Al descargar</option><option value="credito">A crédito</option></select></div>
   <div id="diasBox" hidden><label>Días de crédito</label><input name="dias_credito" type="number" placeholder="15"></div></div>
-  <label>Precio (solo lo ven los administradores)</label><input name="precio" type="number" step="0.01" placeholder="MXN">
+  <div class="g2"><div><label>Precio ofrecido (público)</label><input name="precio_ofrecido" type="number" step="0.01" placeholder="MXN"></div>
+  <div><label>Precio a cobrar (solo administradores)</label><input name="precio" type="number" step="0.01" placeholder="MXN"></div></div>
   <div style="height:14px"></div><button class="btn full" type="submit">Publicar viaje</button></form></div>`;
 }
 function listaAdmin(data){
@@ -295,7 +297,7 @@ function listaAdmin(data){
       <button class="btn sec sm" data-act="img" data-v="${v.id}">Imagen con precio</button></div></div>`;
     }).join('');
     return `<div class="card"><div class="row sp"><h3>${esc(dir(v))}</h3></div>
-    <div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${esc(pagoTxt(v))} · Precio: <b>${p&&p.precio!=null?'$'+Number(p.precio).toLocaleString('es-MX')+' '+esc(p.moneda):'sin precio'}</b></div>
+    <div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${esc(pagoTxt(v))} · Ofrecido: <b>${v.precio_ofrecido!=null?'$'+Number(v.precio_ofrecido).toLocaleString('es-MX'):'—'}</b> · A cobrar: <b>${p&&p.precio!=null?'$'+Number(p.precio).toLocaleString('es-MX')+' '+esc(p.moneda):'—'}</b></div>
     <div class="row" style="margin-top:8px"><select data-chg="viajeEstado" data-id="${v.id}" style="width:auto">${['disponible','asignado','cancelado'].map(e=>`<option ${v.estado===e?'selected':''}>${e}</option>`).join('')}</select>
     <button class="btn sec sm" data-act="delViaje" data-id="${v.id}">Borrar</button></div>
     ${ints||'<div class="inter mut">Sin interesados todavía.</div>'}</div>`;
@@ -366,6 +368,7 @@ function filaHtml(r){
   <td>${inp(r,'notas','text')}</td>
   ${cel(r,'forma_pago',fp)}
   <td>${inp(r,'dias_credito','number',cred?'':'disabled')}</td>
+  <td>${inp(r,'precio_ofrecido','number','step="0.01" placeholder="MXN"')}</td>
   ${cel(r,'precio',inp(r,'precio','number','step="0.01" placeholder="MXN"'))}
   <td><select data-cell="estado" data-id="${r.id}">${['disponible','asignado','cancelado'].map(e=>`<option ${r.estado===e?'selected':''}>${e}</option>`).join('')}</select></td>
   <td style="text-align:center"><input type="checkbox" data-cell="permitir_repetido" data-id="${r.id}" ${r.permitir_repetido?'checked':''} style="width:auto;min-width:0;margin:12px"></td>
@@ -378,7 +381,7 @@ async function vistaTabla(){
   const falt=S.rows.filter(r=>nFaltan(r)>0).length;
   const lista=S.soloFaltan?S.rows.filter(r=>nFaltan(r)>0):S.rows;
   const nCan=S.rows.filter(r=>r.estado==='cancelado').length;
-  const heads=['Origen: ciudad','Origen: estado','Destino: ciudad','Destino: estado','Fecha de carga','Horario','Unidad','Equipo','Medida (pies)','Temp. °C','Peso mín (ton)','Peso máx (ton)','Tarimas','Mercancía','Ida y vuelta','Requerimientos','Notas','Forma de pago','Días crédito','Precio','Estado','Repetido a propósito',''];
+  const heads=['Origen: ciudad','Origen: estado','Destino: ciudad','Destino: estado','Fecha de carga','Horario','Unidad','Equipo','Medida (pies)','Temp. °C','Peso mín (ton)','Peso máx (ton)','Tarimas','Mercancía','Ida y vuelta','Requerimientos','Notas','Forma de pago','Días crédito','Precio ofrecido (público)','Precio a cobrar (solo admin)','Estado','Repetido a propósito',''];
   return `<div class="row sp"><button class="btn sm" data-act="filaNueva">+ Agregar viaje</button>${nCan?`<button class="btn sec sm" data-act="delCanceladas">Borrar ${nCan} cancelados</button>`:''}
   <label class="row" style="margin:0;color:var(--tx)"><input type="checkbox" data-chg="soloFaltan" style="width:auto" ${S.soloFaltan?'checked':''}> Solo con datos faltantes</label></div>
   <p class="mut">${S.rows.length} viajes · ${falt} con datos por completar (celdas amarillas). Cada cambio se guarda solo al salir de la celda. Desliza hacia los lados para ver todas las columnas.</p>
@@ -407,7 +410,7 @@ async function celda(el){
       if(f==='permitir_repetido')upd[f]=el.checked;
       else if(f==='ida_y_vuelta')upd[f]=v==='si';
       else if(f==='medida_pies')upd[f]=(v||'').trim()||null;
-      else if(['temperatura_c','peso_ton_min','peso_ton_max','tarimas','dias_credito'].includes(f))upd[f]=num(v);
+      else if(['precio_ofrecido','temperatura_c','peso_ton_min','peso_ton_max','tarimas','dias_credito'].includes(f))upd[f]=num(v);
       else if(f==='forma_pago'){upd[f]=nn(v);if(upd[f]!=='credito')upd.dias_credito=null}
       else upd[f]=nn(v);
       if((f==='origen_ciudad'||f==='origen_estado')&&upd[f]===null)throw new Error('El origen no puede quedar vacío');
@@ -482,7 +485,7 @@ const acts={
     if(error)throw error;await refresh();
   },
   wa:async b=>{const v=await viajeAdmin(b.dataset.v);let tel=(b.dataset.tel||'').replace(/\D/g,'');if(tel.length===10)tel='52'+tel;
-    const p=one(v.viajes_privado);const txt=lineas(v).map(x=>x[0]+': '+x[1]).join('\n')+(p&&p.precio!=null?'\nPrecio: $'+Number(p.precio).toLocaleString('es-MX')+' '+p.moneda:'');
+    const p=one(v.viajes_privado);const txt=lineas(v).map(x=>x[0]+': '+x[1]).join('\n');
     window.open('https://wa.me/'+tel+'?text='+encodeURIComponent('Hola, te comparto el viaje:\n'+txt),'_blank')},
   img:async b=>{const v=await viajeAdmin(b.dataset.v);await imagenViaje(v,one(v.viajes_privado))}
 };
@@ -541,7 +544,7 @@ const forms={
     const g=n=>f.elements[n]?.value;const cajas=vals(f,'cajas');
     const fp=nn(g('forma_pago'));
     const row={origen_ciudad:nn(g('origen_ciudad')),origen_estado:g('origen_estado'),destino_ciudad:nn(g('destino_ciudad')),destino_estado:nn(g('destino_estado')),
-      fecha_carga:nn(g('fecha_carga')),horario_carga:nn(g('horario_carga')),unidades:vals(f,'unidades'),cajas,medida_pies:nn(g('medida_pies')),
+      fecha_carga:nn(g('fecha_carga')),horario_carga:nn(g('horario_carga')),unidades:vals(f,'unidades'),cajas,medida_pies:nn(g('medida_pies')),precio_ofrecido:num(g('precio_ofrecido')),
       temperatura_c:cajas.includes('termo')?num(g('temperatura_c')):null,peso_ton_min:num(g('peso_ton_min')),peso_ton_max:num(g('peso_ton_max')),
       tarimas:num(g('tarimas')),descripcion_carga:nn(g('descripcion_carga')),ida_y_vuelta:g('ida_y_vuelta')==='si',requerimientos:nn(g('requerimientos')),
       notas:nn(g('notas')),forma_pago:fp,dias_credito:fp==='credito'?num(g('dias_credito')):null,permitir_repetido:!!f.elements['permitir_repetido']?.checked};
@@ -562,13 +565,14 @@ async function imagenViaje(v,p){
   let y=230;
   const wrap=(t,w)=>{const out=[];let ln='';for(const wd of String(t).split(' ')){const test=ln?ln+' '+wd:wd;if(x.measureText(test).width>w&&ln){out.push(ln);ln=wd}else ln=test}if(ln)out.push(ln);return out};
   for(const [k,val] of lineas(v)){
+    if(k==='Precio ofrecido')continue;
     x.fillStyle='#667085';x.font='34px sans-serif';x.fillText(k.toUpperCase(),50,y);y+=46;
     x.fillStyle='#14181f';x.font='bold 42px sans-serif';
     for(const ln of wrap(val,980)){x.fillText(ln,50,y);y+=54}
     y+=22;if(y>1150)break;
   }
-  if(p&&p.precio!=null){x.fillStyle='#16794c';x.fillRect(0,1190,1080,160);x.fillStyle='#fff';x.font='bold 74px sans-serif';
-    x.fillText('$'+Number(p.precio).toLocaleString('es-MX')+' '+p.moneda,50,1295)}
+  if(v.precio_ofrecido!=null){x.fillStyle='#16794c';x.fillRect(0,1190,1080,160);x.fillStyle='#fff';x.font='bold 74px sans-serif';
+    x.fillText('$'+Number(v.precio_ofrecido).toLocaleString('es-MX')+' MXN',50,1295)}
   const blob=await new Promise(r=>c.toBlob(r,'image/png'));
   const file=new File([blob],'viaje.png',{type:'image/png'});
   try{
