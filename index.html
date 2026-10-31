@@ -104,9 +104,9 @@ const CAJA_N=Object.fromEntries(CAJAS);
 const MEDIDAS_TRACTO=['53','48','45','40'];
 function medidasPara(unidades){
   const u=unidades||[];
-  return (!u.length||u.includes('Tracto'))?MEDIDAS_TRACTO:MEDIDAS_TRACTO.filter(m=>m!=='53'&&m!=='48');
+  return (!u.length||u.includes('Tracto'))?MEDIDAS_TRACTO:[];
 }
-const medidaMala=r=>[48,53].includes(Number(r.medida_pies))&&(r.unidades||[]).length>0&&!(r.unidades||[]).includes('Tracto');
+const medidaMala=r=>!!r.medida_pies&&(r.unidades||[]).length>0&&!(r.unidades||[]).includes('Tracto');
 function optsMedida(unidades,actual){
   const L=medidasPara(unidades).slice();const a=actual==null?'':String(actual);
   if(a&&!L.includes(a))L.push(a);
