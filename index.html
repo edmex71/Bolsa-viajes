@@ -259,6 +259,7 @@ function formViaje(){
   <label>Mercancía</label><input name="descripcion_carga" placeholder="Congelado, maquinaria…">
   <label>Requerimientos especiales</label><input name="requerimientos" placeholder="GPS compartido con el cliente…">
   <label>Notas</label><textarea name="notas"></textarea>
+  <label class="row" style="color:var(--tx)"><input type="checkbox" name="permitir_repetido" style="width:auto"> Es otro viaje distinto aunque la ruta y la fecha sean iguales</label>
   <div class="g2"><div><label>Forma de pago</label><select name="forma_pago"><option value="">Por definir</option><option value="50-50">50% y 50%</option><option value="al_descargar">Al descargar</option><option value="credito">A crédito</option></select></div>
   <div id="diasBox" hidden><label>Días de crédito</label><input name="dias_credito" type="number" placeholder="15"></div></div>
   <label>Precio (solo lo ven los administradores)</label><input name="precio" type="number" step="0.01" placeholder="MXN">
@@ -307,6 +308,11 @@ async function vistaChoferes(){
 
 /* ---------- tabla de viajes (administrador) ---------- */
 const FALTAN=['destino_ciudad','fecha_carga','unidades','cajas','forma_pago','precio'];
+function friendly(e){
+  if(e&&e.code==='23505'&&String(e.message).includes('viajes_sin_repetidos'))return new Error('Ya existe un viaje con el mismo origen, destino y fecha. Si es otro viaje distinto, marca "Repetido a propósito".');
+  return e;
+}
+const rutaKey=(a,b)=>(a||'').trim().toLowerCase()+'|'+(b||'').trim().toLowerCase();
 function vacio(r,f){
   if(f==='unidades'||f==='cajas')return !(r[f]&&r[f].length);
   return r[f]===null||r[f]===undefined||r[f]==='';
@@ -345,6 +351,7 @@ function filaHtml(r){
   <td>${inp(r,'dias_credito','number',cred?'':'disabled')}</td>
   ${cel(r,'precio',inp(r,'precio','number','step="0.01" placeholder="MXN"'))}
   <td><select data-cell="estado" data-id="${r.id}">${['disponible','asignado','cancelado'].map(e=>`<option ${r.estado===e?'selected':''}>${e}</option>`).join('')}</select></td>
+  <td style="text-align:center"><input type="checkbox" data-cell="permitir_repetido" data-id="${r.id}" ${r.permitir_repetido?'checked':''} style="width:auto;min-width:0;margin:12px"></td>
   <td><button type="button" class="cellbtn" data-act="delFila" data-id="${r.id}">Borrar</button></td></tr>`;
 }
 async function vistaTabla(){
@@ -353,8 +360,9 @@ async function vistaTabla(){
   S.rows=(data||[]).map(r=>({...r,precio:one(r.viajes_privado)?.precio??null}));
   const falt=S.rows.filter(r=>nFaltan(r)>0).length;
   const lista=S.soloFaltan?S.rows.filter(r=>nFaltan(r)>0):S.rows;
-  const heads=['Origen: ciudad','Origen: estado','Destino: ciudad','Destino: estado','Fecha de carga','Horario','Unidad','Equipo','Medida (pies)','Temp. °C','Peso mín (ton)','Peso máx (ton)','Tarimas','Mercancía','Ida y vuelta','Requerimientos','Notas','Forma de pago','Días crédito','Precio','Estado',''];
-  return `<div class="row sp"><button class="btn sm" data-act="filaNueva">+ Agregar viaje</button>
+  const nCan=S.rows.filter(r=>r.estado==='cancelado').length;
+  const heads=['Origen: ciudad','Origen: estado','Destino: ciudad','Destino: estado','Fecha de carga','Horario','Unidad','Equipo','Medida (pies)','Temp. °C','Peso mín (ton)','Peso máx (ton)','Tarimas','Mercancía','Ida y vuelta','Requerimientos','Notas','Forma de pago','Días crédito','Precio','Estado','Repetido a propósito',''];
+  return `<div class="row sp"><button class="btn sm" data-act="filaNueva">+ Agregar viaje</button>${nCan?`<button class="btn sec sm" data-act="delCanceladas">Borrar ${nCan} cancelados</button>`:''}
   <label class="row" style="margin:0;color:var(--tx)"><input type="checkbox" data-chg="soloFaltan" style="width:auto" ${S.soloFaltan?'checked':''}> Solo con datos faltantes</label></div>
   <p class="mut">${S.rows.length} viajes · ${falt} con datos por completar (celdas amarillas). Cada cambio se guarda solo al salir de la celda. Desliza hacia los lados para ver todas las columnas.</p>
   <div id="tw" class="tw"><table class="tbl"><thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${lista.map(filaHtml).join('')}</tbody></table></div>`;
@@ -365,7 +373,7 @@ function pintaFila(id){
 }
 async function guardaViaje(id,upd){
   const {error}=await sb.from('viajes').update(upd).eq('id',id);
-  if(error)throw error;
+  if(error)throw friendly(error);
   const r=S.rows.find(x=>x.id===id);if(r)Object.assign(r,upd);
   toast('Guardado');
 }
@@ -379,7 +387,8 @@ async function celda(el){
       r.precio=n;toast('Guardado');
     }else{
       const upd={};
-      if(f==='ida_y_vuelta')upd[f]=v==='si';
+      if(f==='permitir_repetido')upd[f]=el.checked;
+      else if(f==='ida_y_vuelta')upd[f]=v==='si';
       else if(['medida_pies','temperatura_c','peso_ton_min','peso_ton_max','tarimas','dias_credito'].includes(f))upd[f]=num(v);
       else if(f==='forma_pago'){upd[f]=nn(v);if(upd[f]!=='credito')upd.dias_credito=null}
       else upd[f]=nn(v);
@@ -418,9 +427,16 @@ const acts={
     await guardaViaje(S.mm.id,upd);$('#dlgMulti').close();pintaFila(S.mm.id);
   },
   mmCancel:()=>$('#dlgMulti').close(),
+  delCanceladas:async()=>{
+    const n=(S.rows||[]).filter(r=>r.estado==='cancelado').length;if(!n)return;
+    if(!confirm(`¿Borrar ${n} viaje(s) cancelados? No se puede deshacer.`))return;
+    const {error}=await sb.from('viajes').delete().eq('estado','cancelado');if(error)throw error;
+    toast('Viajes cancelados borrados');await render();
+  },
   filaNueva:async()=>{
     const {error}=await sb.from('viajes').insert({origen_ciudad:'Por completar',origen_estado:'Por completar',forma_pago:null});
-    if(error)throw error;await render();
+    if(error){if(error.code==='23505')throw new Error('Ya tienes una fila "Por completar". Complétala antes de agregar otra.');throw error}
+    await render();
     setTimeout(()=>{const w=$('#tw');if(w)w.scrollTop=w.scrollHeight},60);
   },
   delFila:async b=>{
@@ -509,8 +525,10 @@ const forms={
       fecha_carga:nn(g('fecha_carga')),horario_carga:nn(g('horario_carga')),unidades:vals(f,'unidades'),cajas,medida_pies:num(g('medida_pies')),
       temperatura_c:cajas.includes('termo')?num(g('temperatura_c')):null,peso_ton_min:num(g('peso_ton_min')),peso_ton_max:num(g('peso_ton_max')),
       tarimas:num(g('tarimas')),descripcion_carga:nn(g('descripcion_carga')),ida_y_vuelta:g('ida_y_vuelta')==='si',requerimientos:nn(g('requerimientos')),
-      notas:nn(g('notas')),forma_pago:fp,dias_credito:fp==='credito'?num(g('dias_credito')):null};
-    const r=await sb.from('viajes').insert(row).select('id').single();if(r.error)throw r.error;
+      notas:nn(g('notas')),forma_pago:fp,dias_credito:fp==='credito'?num(g('dias_credito')):null,permitir_repetido:!!f.elements['permitir_repetido']?.checked};
+    const ya=S.viajes.filter(x=>x.estado!=='cancelado'&&rutaKey(x.origen_ciudad,x.destino_ciudad)===rutaKey(row.origen_ciudad,row.destino_ciudad));
+    if(ya.length&&!row.permitir_repetido&&!confirm(`Ya hay ${ya.length} viaje(s) de ${row.origen_ciudad} a ${row.destino_ciudad||'—'} (carga: ${ya.map(x=>x.fecha_carga||'sin fecha').join(', ')}). ¿Agregar otro de todos modos?`))return;
+    const r=await sb.from('viajes').insert(row).select('id').single();if(r.error)throw friendly(r.error);
     const precio=num(g('precio'));
     if(precio!==null){const p=await sb.from('viajes_privado').insert({viaje_id:r.data.id,precio});if(p.error)throw p.error}
     toast('Viaje publicado');S.sub='viajes';await refresh();
