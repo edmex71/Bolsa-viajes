@@ -48,6 +48,18 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
 #toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:90vw;display:none;z-index:20}
 #toast.bad{background:#b42318}
 .empty{text-align:center;color:var(--mut);padding:30px 10px}
+.tw{overflow:auto;max-height:68vh;border:1px solid var(--bd);border-radius:12px;background:var(--card)}
+.tbl{border-collapse:separate;border-spacing:0;font-size:14px;min-width:2300px}
+.tbl th{position:sticky;top:0;z-index:3;background:var(--soft);text-align:left;padding:9px 8px;white-space:nowrap;border-bottom:1px solid var(--bd);border-right:1px solid var(--bd);font-weight:600}
+.tbl td{padding:0;border-bottom:1px solid var(--bd);border-right:1px solid var(--bd);min-width:120px}
+.tbl td input,.tbl td select{border:0;border-radius:0;background:transparent;padding:11px 8px;width:100%;min-width:110px}
+.tbl td input:disabled{opacity:.35}
+.tbl td.falta{background:color-mix(in srgb,var(--warn) 22%,var(--card))}
+.tbl th:first-child,.tbl td:first-child{position:sticky;left:0;z-index:2;background:var(--card);min-width:150px}
+.tbl th:first-child{z-index:4;background:var(--soft)}
+.tbl td:first-child.falta{background:color-mix(in srgb,var(--warn) 22%,var(--card))}
+.cellbtn{border:0;background:transparent;color:var(--pri);padding:11px 8px;font:inherit;white-space:nowrap;text-align:left;cursor:pointer;width:100%}
+main.wide{max-width:none}
 </style>
 </head>
 <body>
@@ -71,6 +83,11 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
       <button class="btn sec" type="button" data-act="cerrar">Cancelar</button>
     </div>
   </form>
+</dialog>
+<dialog id="dlgMulti">
+  <h3 id="mmTitle" style="margin:0 0 10px"></h3>
+  <div id="mmBody" class="checks"></div>
+  <div class="row" style="margin-top:14px"><button class="btn" type="button" data-act="mmOk">Aceptar</button><button class="btn sec" type="button" data-act="mmCancel">Cancelar</button></div>
 </dialog>
 <div id="toast"></div>
 
@@ -144,9 +161,9 @@ async function render(){
   const sn=$('#subnav');
   if(S.view==='admin'&&S.admin){
     sn.hidden=false;
-    sn.innerHTML=[['resumen','Resumen'],['publicar','Publicar viaje'],['viajes','Viajes y precios'],['choferes','Choferes']].map(t=>`<button class="${S.sub===t[0]?'on':''}" data-act="sub" data-v="${t[0]}">${t[1]}</button>`).join('');
+    sn.innerHTML=[['resumen','Resumen'],['tabla','Tabla'],['publicar','Publicar viaje'],['viajes','Viajes y precios'],['choferes','Choferes']].map(t=>`<button class="${S.sub===t[0]?'on':''}" data-act="sub" data-v="${t[0]}">${t[1]}</button>`).join('');
   }else sn.hidden=true;
-  const app=$('#app');
+  const app=$('#app');app.classList.toggle('wide',S.view==='admin'&&S.sub==='tabla');
   try{
     if(S.view==='viajes')app.innerHTML=vistaViajes();
     else if(S.view==='perfil')app.innerHTML=vistaPerfil();
@@ -202,6 +219,7 @@ async function datosAdmin(){
   if(v.error)throw v.error;return v.data||[];
 }
 async function vistaAdmin(){
+  if(S.sub==='tabla')return await vistaTabla();
   if(S.sub==='publicar')return formViaje();
   if(S.sub==='choferes')return await vistaChoferes();
   const data=await datosAdmin();
@@ -285,6 +303,92 @@ async function vistaChoferes(){
   }).join('');
 }
 
+/* ---------- tabla de viajes (administrador) ---------- */
+const FALTAN=['destino_ciudad','fecha_carga','unidades','cajas','forma_pago','precio'];
+function vacio(r,f){
+  if(f==='unidades'||f==='cajas')return !(r[f]&&r[f].length);
+  return r[f]===null||r[f]===undefined||r[f]==='';
+}
+const origenFalta=r=>!r.origen_ciudad||r.origen_ciudad==='Por completar'||r.origen_estado==='Por completar';
+const nFaltan=r=>FALTAN.filter(f=>vacio(r,f)).length+(origenFalta(r)?1:0);
+const cel=(r,f,inner)=>`<td class="${FALTAN.includes(f)&&vacio(r,f)?'falta':''}">${inner}</td>`;
+const inp=(r,f,type,extra)=>`<input data-cell="${f}" data-id="${r.id}" type="${type}" value="${esc(r[f]??'')}" ${extra||''}>`;
+function sel(r,f,list,blank){
+  const v=String(r[f]??'');const L=(v===''||list.includes(v))?list:[...list,v];
+  return `<select data-cell="${f}" data-id="${r.id}">${blank?`<option value="">${blank}</option>`:''}${L.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('')}</select>`;
+}
+function filaHtml(r){
+  const termo=(r.cajas||[]).includes('termo'),cred=r.forma_pago==='credito';
+  const mb=(f,txt)=>`<button type="button" class="cellbtn" data-act="multi" data-id="${r.id}" data-field="${f}">${esc(txt)||'+ elegir'}</button>`;
+  const fp=`<select data-cell="forma_pago" data-id="${r.id}"><option value="">Por definir</option>${Object.entries(PAGOS).map(([k,t])=>`<option value="${k}" ${r.forma_pago===k?'selected':''}>${t}</option>`).join('')}</select>`;
+  return `<tr data-row="${r.id}">
+  <td class="${origenFalta(r)?'falta':''}">${inp(r,'origen_ciudad','text')}</td>
+  <td>${sel(r,'origen_estado',ESTADOS,'—')}</td>
+  ${cel(r,'destino_ciudad',inp(r,'destino_ciudad','text'))}
+  <td>${sel(r,'destino_estado',ESTADOS,'—')}</td>
+  ${cel(r,'fecha_carga',inp(r,'fecha_carga','date'))}
+  <td>${inp(r,'horario_carga','text')}</td>
+  ${cel(r,'unidades',mb('unidades',(r.unidades||[]).join(', ')))}
+  <td>${sel(r,'medida_pies',['53','48','40','35'],'—')}</td>
+  ${cel(r,'cajas',mb('cajas',(r.cajas||[]).map(c=>CAJA_N[c]||c).join(', ')))}
+  <td>${inp(r,'temperatura_c','number','step="0.5" '+(termo?'':'disabled'))}</td>
+  <td>${inp(r,'peso_ton_min','number','step="0.1"')}</td>
+  <td>${inp(r,'peso_ton_max','number','step="0.1"')}</td>
+  <td>${inp(r,'tarimas','number')}</td>
+  <td>${inp(r,'descripcion_carga','text')}</td>
+  <td><select data-cell="ida_y_vuelta" data-id="${r.id}"><option value="no">No</option><option value="si" ${r.ida_y_vuelta?'selected':''}>Sí</option></select></td>
+  <td>${inp(r,'requerimientos','text')}</td>
+  <td>${inp(r,'notas','text')}</td>
+  ${cel(r,'forma_pago',fp)}
+  <td>${inp(r,'dias_credito','number',cred?'':'disabled')}</td>
+  ${cel(r,'precio',inp(r,'precio','number','step="0.01" placeholder="MXN"'))}
+  <td><select data-cell="estado" data-id="${r.id}">${['disponible','asignado','cancelado'].map(e=>`<option ${r.estado===e?'selected':''}>${e}</option>`).join('')}</select></td>
+  <td><button type="button" class="cellbtn" data-act="delFila" data-id="${r.id}">Borrar</button></td></tr>`;
+}
+async function vistaTabla(){
+  const {data,error}=await sb.from('viajes').select('*, viajes_privado(precio)').order('created_at',{ascending:true});
+  if(error)throw error;
+  S.rows=(data||[]).map(r=>({...r,precio:one(r.viajes_privado)?.precio??null}));
+  const falt=S.rows.filter(r=>nFaltan(r)>0).length;
+  const lista=S.soloFaltan?S.rows.filter(r=>nFaltan(r)>0):S.rows;
+  const heads=['Origen: ciudad','Origen: estado','Destino: ciudad','Destino: estado','Fecha de carga','Horario','Unidad','Medida (pies)','Caja','Temp. °C','Peso mín (ton)','Peso máx (ton)','Tarimas','Mercancía','Ida y vuelta','Requerimientos','Notas','Forma de pago','Días crédito','Precio','Estado',''];
+  return `<div class="row sp"><button class="btn sm" data-act="filaNueva">+ Agregar viaje</button>
+  <label class="row" style="margin:0;color:var(--tx)"><input type="checkbox" data-chg="soloFaltan" style="width:auto" ${S.soloFaltan?'checked':''}> Solo con datos faltantes</label></div>
+  <p class="mut">${S.rows.length} viajes · ${falt} con datos por completar (celdas amarillas). Cada cambio se guarda solo al salir de la celda. Desliza hacia los lados para ver todas las columnas.</p>
+  <div id="tw" class="tw"><table class="tbl"><thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${lista.map(filaHtml).join('')}</tbody></table></div>`;
+}
+function pintaFila(id){
+  const r=S.rows.find(x=>x.id===id),tr=document.querySelector(`tr[data-row="${id}"]`);
+  if(r&&tr)tr.outerHTML=filaHtml(r);
+}
+async function guardaViaje(id,upd){
+  const {error}=await sb.from('viajes').update(upd).eq('id',id);
+  if(error)throw error;
+  const r=S.rows.find(x=>x.id===id);if(r)Object.assign(r,upd);
+  toast('Guardado');
+}
+async function celda(el){
+  const id=el.dataset.id,f=el.dataset.cell,v=el.value;const r=S.rows.find(x=>x.id===id);
+  try{
+    if(f==='precio'){
+      const n=num(v);
+      if(n===null){const d=await sb.from('viajes_privado').delete().eq('viaje_id',id);if(d.error)throw d.error}
+      else{const u=await sb.from('viajes_privado').upsert({viaje_id:id,precio:n},{onConflict:'viaje_id'});if(u.error)throw u.error}
+      r.precio=n;toast('Guardado');
+    }else{
+      const upd={};
+      if(f==='ida_y_vuelta')upd[f]=v==='si';
+      else if(['medida_pies','temperatura_c','peso_ton_min','peso_ton_max','tarimas','dias_credito'].includes(f))upd[f]=num(v);
+      else if(f==='forma_pago'){upd[f]=nn(v);if(upd[f]!=='credito')upd.dias_credito=null}
+      else upd[f]=nn(v);
+      if((f==='origen_ciudad'||f==='origen_estado')&&upd[f]===null)throw new Error('El origen no puede quedar vacío');
+      await guardaViaje(id,upd);
+    }
+  }catch(err){pintaFila(id);throw err}
+  if(f==='forma_pago'||f==='origen_ciudad'||f==='origen_estado'){pintaFila(id);return}
+  const td=el.closest('td');if(td&&FALTAN.includes(f))td.classList.toggle('falta',vacio(r,f));
+}
+
 /* ---------- acciones ---------- */
 function abrirAuth(){S.authMode='login';pintaAuth();$('#dlg').showModal()}
 function pintaAuth(){const s=S.authMode==='signup';$('#authTitle').textContent=s?'Crear cuenta':'Entrar';$('#authBtn').textContent=s?'Crear cuenta':'Entrar';$('#authToggle').textContent=s?'Ya tengo cuenta':'Crear cuenta';$('#authHint').textContent=s?'Usa un correo que revises, a veces pedimos confirmarlo.':'Entra con tu correo para registrarte en un viaje.'}
@@ -298,6 +402,31 @@ async function registrarInteres(id){
 }
 const acts={
   login:abrirAuth,
+  multi:b=>{
+    const r=S.rows.find(x=>x.id===b.dataset.id),f=b.dataset.field;if(!r)return;
+    const lista=f==='unidades'?S.tipos.map(t=>[t,t]):CAJAS;
+    $('#mmTitle').textContent=f==='unidades'?'Unidad (puede ser más de una)':'Tipo de caja (puede ser más de una)';
+    $('#mmBody').innerHTML=lista.map(([v,l])=>`<label><input type="checkbox" data-mm value="${esc(v)}" ${(r[f]||[]).includes(v)?'checked':''}>${esc(l)}</label>`).join('');
+    S.mm={id:r.id,field:f};$('#dlgMulti').showModal();
+  },
+  mmOk:async()=>{
+    const vals=[...document.querySelectorAll('#mmBody [data-mm]:checked')].map(i=>i.value);
+    const upd={[S.mm.field]:vals};
+    if(S.mm.field==='cajas'&&!vals.includes('termo'))upd.temperatura_c=null;
+    await guardaViaje(S.mm.id,upd);$('#dlgMulti').close();pintaFila(S.mm.id);
+  },
+  mmCancel:()=>$('#dlgMulti').close(),
+  filaNueva:async()=>{
+    const {error}=await sb.from('viajes').insert({origen_ciudad:'Por completar',origen_estado:'Por completar',forma_pago:null});
+    if(error)throw error;await render();
+    setTimeout(()=>{const w=$('#tw');if(w)w.scrollTop=w.scrollHeight},60);
+  },
+  delFila:async b=>{
+    if(!confirm('¿Borrar este viaje?'))return;
+    const {error}=await sb.from('viajes').delete().eq('id',b.dataset.id);if(error)throw error;
+    S.rows=S.rows.filter(x=>x.id!==b.dataset.id);
+    document.querySelector(`tr[data-row="${b.dataset.id}"]`)?.remove();toast('Viaje borrado');
+  },
   cerrar:()=>$('#dlg').close(),
   toggleAuth:()=>{S.authMode=S.authMode==='login'?'signup':'login';pintaAuth()},
   logout:async()=>{await sb.auth.signOut();S.view='viajes';await refresh()},
@@ -322,6 +451,7 @@ const acts={
 };
 async function viajeAdmin(id){const d=await datosAdmin();return d.find(v=>v.id===id)}
 const changes={
+  soloFaltan:async s=>{S.soloFaltan=s.checked;await render()},
   fOrigen:async s=>{S.fOrigen=s.value;await render()},
   fUnidad:async s=>{S.fUnidad=s.value;await render()},
   viajeEstado:async s=>{const {error}=await sb.from('viajes').update({estado:s.value}).eq('id',s.dataset.id);if(error)throw error;toast('Estado actualizado');await refresh()},
@@ -417,6 +547,7 @@ document.addEventListener('change',async e=>{
   const s=e.target;
   if(s.name==='cajas'){const f=s.closest('form');const t=f.querySelector('#tempBox');if(t)t.hidden=!vals(f,'cajas').includes('termo');return}
   if(s.name==='forma_pago'){const d=s.closest('form').querySelector('#diasBox');if(d)d.hidden=s.value!=='credito';return}
+  if(s.dataset?.cell){try{await celda(s)}catch(err){toast(err.message||'Error',true)}return}
   const k=s.dataset?.chg;if(!k)return;
   try{await changes[k](s)}catch(err){toast(err.message||'Error',true)}
 });
