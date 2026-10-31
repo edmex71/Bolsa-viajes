@@ -235,7 +235,7 @@ function vistaPerfil(){
 
 /* ---------- administrador ---------- */
 async function datosAdmin(){
-  const v=await sb.from('viajes').select('*, viajes_privado(precio,moneda), interesados(id,estado,created_at, chofer:choferes(id,nombre,telefono,ciudad,estado,licencia_federal, choferes_admin(verificacion)))').order('created_at',{ascending:false});
+  const v=await sb.from('viajes').select('*, viajes_privado(precio,moneda,contacto), interesados(id,estado,created_at, chofer:choferes(id,nombre,telefono,ciudad,estado,licencia_federal, choferes_admin(verificacion)))').order('created_at',{ascending:false});
   if(v.error)throw v.error;return v.data||[];
 }
 async function vistaAdmin(){
@@ -282,6 +282,7 @@ function formViaje(){
   <div id="diasBox" hidden><label>Días de crédito</label><input name="dias_credito" type="number" placeholder="15"></div></div>
   <div class="g2"><div><label>Precio ofrecido (público)</label><input name="precio_ofrecido" type="number" step="0.01" placeholder="MXN"></div>
   <div><label>Precio a cobrar (solo administradores)</label><input name="precio" type="number" step="0.01" placeholder="MXN"></div></div>
+  <label>Contacto: quién ofreció el viaje / a quién se cobra (solo administradores)</label><input name="contacto" placeholder="Nombre, empresa o teléfono">
   <div style="height:14px"></div><button class="btn full" type="submit">Publicar viaje</button></form></div>`;
 }
 function listaAdmin(data){
@@ -297,7 +298,7 @@ function listaAdmin(data){
       <button class="btn sec sm" data-act="img" data-v="${v.id}">Imagen con precio</button></div></div>`;
     }).join('');
     return `<div class="card"><div class="row sp"><h3>${esc(dir(v))}</h3></div>
-    <div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${esc(pagoTxt(v))} · Ofrecido: <b>${v.precio_ofrecido!=null?'$'+Number(v.precio_ofrecido).toLocaleString('es-MX'):'—'}</b> · A cobrar: <b>${p&&p.precio!=null?'$'+Number(p.precio).toLocaleString('es-MX')+' '+esc(p.moneda):'—'}</b></div>
+    <div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${esc(pagoTxt(v))} · Ofrecido: <b>${v.precio_ofrecido!=null?'$'+Number(v.precio_ofrecido).toLocaleString('es-MX'):'—'}</b> · Contacto: <b>${esc(p&&p.contacto||'—')}</b> · A cobrar: <b>${p&&p.precio!=null?'$'+Number(p.precio).toLocaleString('es-MX')+' '+esc(p.moneda):'—'}</b></div>
     <div class="row" style="margin-top:8px"><select data-chg="viajeEstado" data-id="${v.id}" style="width:auto">${['disponible','asignado','cancelado'].map(e=>`<option ${v.estado===e?'selected':''}>${e}</option>`).join('')}</select>
     <button class="btn sec sm" data-act="delViaje" data-id="${v.id}">Borrar</button></div>
     ${ints||'<div class="inter mut">Sin interesados todavía.</div>'}</div>`;
@@ -370,18 +371,19 @@ function filaHtml(r){
   <td>${inp(r,'dias_credito','number',cred?'':'disabled')}</td>
   <td>${inp(r,'precio_ofrecido','number','step="0.01" placeholder="MXN"')}</td>
   ${cel(r,'precio',inp(r,'precio','number','step="0.01" placeholder="MXN"'))}
+  <td>${inp(r,'contacto','text','placeholder="Nombre / empresa / tel."')}</td>
   <td><select data-cell="estado" data-id="${r.id}">${['disponible','asignado','cancelado'].map(e=>`<option ${r.estado===e?'selected':''}>${e}</option>`).join('')}</select></td>
   <td style="text-align:center"><input type="checkbox" data-cell="permitir_repetido" data-id="${r.id}" ${r.permitir_repetido?'checked':''} style="width:auto;min-width:0;margin:12px"></td>
   <td><button type="button" class="cellbtn" data-act="delFila" data-id="${r.id}">Borrar</button></td></tr>`;
 }
 async function vistaTabla(){
-  const {data,error}=await sb.from('viajes').select('*, viajes_privado(precio)').order('created_at',{ascending:true});
+  const {data,error}=await sb.from('viajes').select('*, viajes_privado(precio,contacto)').order('created_at',{ascending:true});
   if(error)throw error;
-  S.rows=(data||[]).map(r=>({...r,precio:one(r.viajes_privado)?.precio??null}));
+  S.rows=(data||[]).map(r=>({...r,precio:one(r.viajes_privado)?.precio??null,contacto:one(r.viajes_privado)?.contacto??''}));
   const falt=S.rows.filter(r=>nFaltan(r)>0).length;
   const lista=S.soloFaltan?S.rows.filter(r=>nFaltan(r)>0):S.rows;
   const nCan=S.rows.filter(r=>r.estado==='cancelado').length;
-  const heads=['Origen: ciudad','Origen: estado','Destino: ciudad','Destino: estado','Fecha de carga','Horario','Unidad','Equipo','Medida (pies)','Temp. °C','Peso mín (ton)','Peso máx (ton)','Tarimas','Mercancía','Ida y vuelta','Requerimientos','Notas','Forma de pago','Días crédito','Precio ofrecido (público)','Precio a cobrar (solo admin)','Estado','Repetido a propósito',''];
+  const heads=['Origen: ciudad','Origen: estado','Destino: ciudad','Destino: estado','Fecha de carga','Horario','Unidad','Equipo','Medida (pies)','Temp. °C','Peso mín (ton)','Peso máx (ton)','Tarimas','Mercancía','Ida y vuelta','Requerimientos','Notas','Forma de pago','Días crédito','Precio ofrecido (público)','Precio a cobrar (solo admin)','Contacto (solo admin)','Estado','Repetido a propósito',''];
   return `<div class="row sp"><button class="btn sm" data-act="filaNueva">+ Agregar viaje</button>${nCan?`<button class="btn sec sm" data-act="delCanceladas">Borrar ${nCan} cancelados</button>`:''}
   <label class="row" style="margin:0;color:var(--tx)"><input type="checkbox" data-chg="soloFaltan" style="width:auto" ${S.soloFaltan?'checked':''}> Solo con datos faltantes</label></div>
   <p class="mut">${S.rows.length} viajes · ${falt} con datos por completar (celdas amarillas). Cada cambio se guarda solo al salir de la celda. Desliza hacia los lados para ver todas las columnas.</p>
@@ -400,11 +402,10 @@ async function guardaViaje(id,upd){
 async function celda(el){
   const id=el.dataset.id,f=el.dataset.cell,v=el.value;const r=S.rows.find(x=>x.id===id);
   try{
-    if(f==='precio'){
-      const n=num(v);
-      if(n===null){const d=await sb.from('viajes_privado').delete().eq('viaje_id',id);if(d.error)throw d.error}
-      else{const u=await sb.from('viajes_privado').upsert({viaje_id:id,precio:n},{onConflict:'viaje_id'});if(u.error)throw u.error}
-      r.precio=n;toast('Guardado');
+    if(f==='precio'||f==='contacto'){
+      const val=f==='precio'?num(v):(v||'').trim()||null;
+      const u=await sb.from('viajes_privado').upsert({viaje_id:id,[f]:val},{onConflict:'viaje_id'});if(u.error)throw u.error;
+      r[f]=f==='precio'?val:(val||'');toast('Guardado');
     }else{
       const upd={};
       if(f==='permitir_repetido')upd[f]=el.checked;
@@ -551,8 +552,8 @@ const forms={
     const ya=S.viajes.filter(x=>x.estado!=='cancelado'&&rutaKey(x.origen_ciudad,x.destino_ciudad)===rutaKey(row.origen_ciudad,row.destino_ciudad));
     if(ya.length&&!row.permitir_repetido&&!confirm(`Ya hay ${ya.length} viaje(s) de ${row.origen_ciudad} a ${row.destino_ciudad||'—'} (carga: ${ya.map(x=>x.fecha_carga||'sin fecha').join(', ')}). ¿Agregar otro de todos modos?`))return;
     const r=await sb.from('viajes').insert(row).select('id').single();if(r.error)throw friendly(r.error);
-    const precio=num(g('precio'));
-    if(precio!==null){const p=await sb.from('viajes_privado').insert({viaje_id:r.data.id,precio});if(p.error)throw p.error}
+    const precio=num(g('precio')),contacto=nn(g('contacto'));
+    if(precio!==null||contacto){const p=await sb.from('viajes_privado').insert({viaje_id:r.data.id,precio,contacto});if(p.error)throw p.error}
     toast('Viaje publicado');S.sub='viajes';await refresh();
   }
 };
