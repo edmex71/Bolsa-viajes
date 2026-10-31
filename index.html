@@ -101,7 +101,7 @@ const ESTADOS=['Aguascalientes','Baja California','Baja California Sur','Campech
 const CAJAS=[['seca','Caja seca'],['cerrada','Cerrada'],['termo','Refrigerada (termo)'],['plataforma','Plataforma'],['lowboy','Lowboy']];
 const CAJA_N=Object.fromEntries(CAJAS);
 /* medida (pies): el Tracto puede ser 53, 48, 45 o 40; las demás unidades (torton, camionetas, rabón…) no pueden ser 48 ni 53 */
-const MEDIDAS_TRACTO=['53','48','45','40'];
+const MEDIDAS_TRACTO=['53','48','48 o 53','45','40'];
 function medidasPara(unidades){
   const u=unidades||[];
   return (!u.length||u.includes('Tracto'))?MEDIDAS_TRACTO:[];
@@ -110,7 +110,7 @@ const medidaMala=r=>!!r.medida_pies&&(r.unidades||[]).length>0&&!(r.unidades||[]
 function optsMedida(unidades,actual){
   const L=medidasPara(unidades).slice();const a=actual==null?'':String(actual);
   if(a&&!L.includes(a))L.push(a);
-  return '<option value="">—</option>'+L.map(m=>`<option value="${m}" ${a===m?'selected':''}>${m} pies</option>`).join('');
+  return '<option value="">—</option>'+L.map(m=>`<option value="${m}" ${a===m?'selected':''}>${m==='48 o 53'?'48 o 53 (indistinto)':m+' pies'}</option>`).join('');
 }
 function pintaMedidas(form){
   const s=form.querySelector('select[name="medida_pies"]');if(!s)return;
@@ -406,7 +406,8 @@ async function celda(el){
       const upd={};
       if(f==='permitir_repetido')upd[f]=el.checked;
       else if(f==='ida_y_vuelta')upd[f]=v==='si';
-      else if(['medida_pies','temperatura_c','peso_ton_min','peso_ton_max','tarimas','dias_credito'].includes(f))upd[f]=num(v);
+      else if(f==='medida_pies')upd[f]=(v||'').trim()||null;
+      else if(['temperatura_c','peso_ton_min','peso_ton_max','tarimas','dias_credito'].includes(f))upd[f]=num(v);
       else if(f==='forma_pago'){upd[f]=nn(v);if(upd[f]!=='credito')upd.dias_credito=null}
       else upd[f]=nn(v);
       if((f==='origen_ciudad'||f==='origen_estado')&&upd[f]===null)throw new Error('El origen no puede quedar vacío');
@@ -507,7 +508,7 @@ function datosChofer(f){
   if(clabe&&!/^\d{18}$/.test(clabe))throw new Error('La CLABE debe tener 18 dígitos');
   return {nombre:nn(g('nombre')),telefono:nn(g('telefono')),ciudad:nn(g('ciudad')),estado:nn(g('estado')),
     licencia_federal:nn(g('licencia_federal'))?.toUpperCase().replace(/\s+/g,''),licencia_vence:nn(g('licencia_vence')),
-    unidades:vals(f,'unidades'),medida_pies:num(g('medida_pies')),cajas:vals(f,'cajas'),placas:nn(g('placas'))?.toUpperCase(),
+    unidades:vals(f,'unidades'),medida_pies:nn(g('medida_pies')),cajas:vals(f,'cajas'),placas:nn(g('placas'))?.toUpperCase(),
     seguro_vence:nn(g('seguro_vence')),banco:nn(g('banco')),titular:nn(g('titular')),clabe};
 }
 const forms={
@@ -540,7 +541,7 @@ const forms={
     const g=n=>f.elements[n]?.value;const cajas=vals(f,'cajas');
     const fp=nn(g('forma_pago'));
     const row={origen_ciudad:nn(g('origen_ciudad')),origen_estado:g('origen_estado'),destino_ciudad:nn(g('destino_ciudad')),destino_estado:nn(g('destino_estado')),
-      fecha_carga:nn(g('fecha_carga')),horario_carga:nn(g('horario_carga')),unidades:vals(f,'unidades'),cajas,medida_pies:num(g('medida_pies')),
+      fecha_carga:nn(g('fecha_carga')),horario_carga:nn(g('horario_carga')),unidades:vals(f,'unidades'),cajas,medida_pies:nn(g('medida_pies')),
       temperatura_c:cajas.includes('termo')?num(g('temperatura_c')):null,peso_ton_min:num(g('peso_ton_min')),peso_ton_max:num(g('peso_ton_max')),
       tarimas:num(g('tarimas')),descripcion_carga:nn(g('descripcion_carga')),ida_y_vuelta:g('ida_y_vuelta')==='si',requerimientos:nn(g('requerimientos')),
       notas:nn(g('notas')),forma_pago:fp,dias_credito:fp==='credito'?num(g('dias_credito')):null,permitir_repetido:!!f.elements['permitir_repetido']?.checked};
