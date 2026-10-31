@@ -97,7 +97,7 @@ function fmtFecha(f){if(!f)return 'Fecha por definir';return new Date(f+'T12:00:
 function pesoTxt(v){const a=v.peso_ton_min,b=v.peso_ton_max;if(a==null&&b==null)return '';if(a!=null&&b!=null&&a!==b)return a+'–'+b+' ton';return (a??b)+' ton'}
 function one(x){return Array.isArray(x)?x[0]:x}
 function dir(v){return (v.origen_ciudad+', '+v.origen_estado)+' → '+(v.destino_ciudad?v.destino_ciudad+(v.destino_estado?', '+v.destino_estado:''):'Servicio local / por definir')}
-function pagoTxt(v){return v.forma_pago==='credito'?('A crédito'+(v.dias_credito?' a '+v.dias_credito+' días':'')):PAGOS[v.forma_pago]}
+function pagoTxt(v){if(!v.forma_pago)return 'Por definir';return v.forma_pago==='credito'?('A crédito'+(v.dias_credito?' a '+v.dias_credito+' días':'')):PAGOS[v.forma_pago]}
 function lineas(v){
   const L=[['Ruta',dir(v)],['Carga',fmtFecha(v.fecha_carga)+(v.horario_carga?' · '+v.horario_carga:'')]];
   const u=[(v.unidades||[]).join(' o '),v.medida_pies?v.medida_pies+' pies':'',(v.cajas||[]).map(c=>CAJA_N[c]||c).join(' o ')].filter(Boolean).join(' · ');
@@ -239,7 +239,7 @@ function formViaje(){
   <label>Mercancía</label><input name="descripcion_carga" placeholder="Congelado, maquinaria…">
   <label>Requerimientos especiales</label><input name="requerimientos" placeholder="GPS compartido con el cliente…">
   <label>Notas</label><textarea name="notas"></textarea>
-  <div class="g2"><div><label>Forma de pago</label><select name="forma_pago" required><option value="50-50">50% y 50%</option><option value="al_descargar">Al descargar</option><option value="credito">A crédito</option></select></div>
+  <div class="g2"><div><label>Forma de pago</label><select name="forma_pago"><option value="">Por definir</option><option value="50-50">50% y 50%</option><option value="al_descargar">Al descargar</option><option value="credito">A crédito</option></select></div>
   <div id="diasBox" hidden><label>Días de crédito</label><input name="dias_credito" type="number" placeholder="15"></div></div>
   <label>Precio (solo lo ven los administradores)</label><input name="precio" type="number" step="0.01" placeholder="MXN">
   <div style="height:14px"></div><button class="btn full" type="submit">Publicar viaje</button></form></div>`;
@@ -372,7 +372,7 @@ const forms={
   },
   viaje:async f=>{
     const g=n=>f.elements[n]?.value;const cajas=vals(f,'cajas');
-    const fp=g('forma_pago');
+    const fp=nn(g('forma_pago'));
     const row={origen_ciudad:nn(g('origen_ciudad')),origen_estado:g('origen_estado'),destino_ciudad:nn(g('destino_ciudad')),destino_estado:nn(g('destino_estado')),
       fecha_carga:nn(g('fecha_carga')),horario_carga:nn(g('horario_carga')),unidades:vals(f,'unidades'),cajas,medida_pies:num(g('medida_pies')),
       temperatura_c:cajas.includes('termo')?num(g('temperatura_c')):null,peso_ton_min:num(g('peso_ton_min')),peso_ton_max:num(g('peso_ton_max')),
