@@ -65,7 +65,7 @@ main.wide{max-width:none}
 <body>
 <header>
   <h1>Bolsa de viajes<small>Transporte D'Leon</small></h1>
-  <div id="hdr"></div>
+  <div class="row" style="gap:8px;flex-wrap:nowrap"><!-- TEMPORAL: quitar al terminar las pruebas --><button class="btn sec sm" data-act="actualizar" title="Cargar la última versión">⟳ Actualizar</button><div id="hdr"></div></div>
 </header>
 <nav id="nav"></nav>
 <nav id="subnav" class="sub" hidden></nav>
@@ -92,7 +92,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 15:20</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 15:45</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -570,6 +570,7 @@ const acts={
   sub:async b=>{S.sub=b.dataset.v;await render()},
   interes:b=>registrarInteres(b.dataset.id),
   verDoc:async b=>{const u=await sb.storage.from('documentos').createSignedUrl(b.dataset.ruta,300);if(u.error)throw u.error;window.open(u.data.signedUrl,'_blank')},
+  actualizar:async()=>{try{if(window.caches){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}}catch(e){}location.replace(location.pathname+'?v='+Date.now())},
   quitaInteres:async b=>{
     if(!confirm('¿Quitar tu interés en este viaje?'))return;
     const d=await sb.from('interesados').delete().eq('viaje_id',b.dataset.id).eq('chofer_id',S.chofer.id).select('id');
