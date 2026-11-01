@@ -92,7 +92,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 31 oct 2026 · 00:20</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 00:10</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -228,7 +228,7 @@ function perfilForm(c,alta){
   <h2>Datos para depósito</h2>
   <div class="g2"><div><label>Banco</label><input name="banco" value="${esc(c.banco)}"></div>
   <div><label>Titular de la cuenta</label><input name="titular" value="${esc(c.titular)}"></div></div>
-  <label>CLABE (18 dígitos)</label><input name="clabe" inputmode="numeric" maxlength="18" value="${esc(c.clabe)}">
+  <label>CLABE (18 dígitos) o tarjeta (16 dígitos)</label><input name="clabe" inputmode="numeric" maxlength="18" placeholder="Solo números" value="${esc(c.clabe)}">
   ${alta?`<label class="row" style="color:var(--tx)"><input type="checkbox" name="verif" style="width:auto"> Ya lo verifiqué personalmente</label>`:''}
   <p class="mut">Tu licencia, tarjeta de circulación y seguro te los pedirá el administrador por WhatsApp.</p>
   <button class="btn full" type="submit">${alta?'Dar de alta chofer':'Guardar mi perfil'}</button></form>`;
@@ -339,7 +339,7 @@ async function vistaChoferes(){
     return `<div class="card"><div class="row sp"><h3>${esc(c.nombre)}</h3><span class="badge ${a.verificacion==='verificado'?'ok':a.verificacion==='rechazado'?'bad':'warn'}">${esc(a.verificacion||'pendiente')}</span></div>
     <div class="mut">${esc(c.telefono)} · ${esc([c.ciudad,c.estado].filter(Boolean).join(', '))}</div>
     <div class="tags"><span class="tag">Lic. ${esc(c.licencia_federal)} (vence ${esc(c.licencia_vence||'—')})</span><span class="tag">${esc((c.unidades||[]).join(', ')||'Sin unidad')}${c.medida_pies?' '+c.medida_pies+'\'':''}</span><span class="tag">Placas ${esc(c.placas||'—')}</span><span class="tag">Seguro vence ${esc(c.seguro_vence||'—')}</span></div>
-    <div class="mut">${esc(c.banco||'')} ${esc(c.titular||'')} ${esc(c.clabe||'')}</div>
+    <div class="mut">${esc(c.banco||'')} ${esc(c.titular||'')} ${c.clabe?(c.clabe.length===16?'Tarjeta ':'CLABE ')+esc(c.clabe):''}</div>
     <div class="row" style="margin-top:8px"><select data-chg="verif" data-id="${c.id}" style="width:auto">${['pendiente','verificado','rechazado'].map(e=>`<option ${a.verificacion===e?'selected':''}>${e}</option>`).join('')}</select>
     <span class="mut">${a.verificado_en?'Verificado el '+esc(a.verificado_en):''}</span></div>
     <div class="mut" style="margin-top:8px"><b>Viajes que eligió:</b></div>
@@ -553,7 +553,7 @@ const changes={
 function datosChofer(f){
   const g=n=>f.elements[n]?.value;
   const clabe=nn(g('clabe'));
-  if(clabe&&!/^\d{18}$/.test(clabe))throw new Error('La CLABE debe tener 18 dígitos');
+  if(clabe&&!/^(\d{16}|\d{18})$/.test(clabe))throw new Error('Escribe la CLABE de 18 dígitos o la tarjeta de 16 dígitos, solo números');
   return {nombre:nn(g('nombre')),telefono:nn(g('telefono')),ciudad:nn(g('ciudad')),estado:nn(g('estado')),
     licencia_federal:nn(g('licencia_federal'))?.toUpperCase().replace(/\s+/g,''),licencia_vence:nn(g('licencia_vence')),
     unidades:vals(f,'unidades'),medida_pies:nn(g('medida_pies')),cajas:vals(f,'cajas'),placas:nn(g('placas'))?.toUpperCase(),
