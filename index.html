@@ -92,7 +92,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 14:45</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 15:00</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -135,8 +135,10 @@ const DOCS_OPC=['medico'];
 const docsReq=c=>['licencia','ine','tc_unidad','seguro'].concat((c&&c.unidades||[]).includes('Tracto')?['tc_caja']:[]);
 const docsMap=l=>Object.fromEntries((l||[]).map(d=>[d.tipo,d]));
 function docsHtml(c,map){
-  const fila=(t,req)=>{const d=map[t];return `<div class="row sp" style="padding:8px 0;border-top:1px solid #e4e7ec"><div><b>${esc(DOCS[t])}</b><div class="mut">${d?'✓ Subido':(req?'Falta':'Opcional')}</div></div>
-  <div class="row">${d?`<button type="button" class="btn sec sm" data-act="verDoc" data-ruta="${esc(d.ruta)}">Ver</button>`:''}<label class="btn sec sm" style="cursor:pointer">${d?'Reemplazar':'Subir'}<input type="file" hidden accept="image/*,application/pdf" data-doc="${t}" data-chofer="${c.id}"></label></div></div>`};
+  const fila=(t,req)=>{const d=map[t];return `<div style="padding:10px 0;border-top:1px solid #e4e7ec"><div class="row sp"><b>${esc(DOCS[t])}</b><span class="badge ${d?'ok':(req?'warn':'')}">${d?'Subido':(req?'Falta':'Opcional')}</span></div>
+  <div class="row" style="margin-top:8px;flex-wrap:wrap;gap:8px">${d?`<button type="button" class="btn sec sm" data-act="verDoc" data-ruta="${esc(d.ruta)}">Ver</button>`:''}
+  <label class="btn sec sm" style="cursor:pointer">📷 Tomar foto<input type="file" hidden accept="image/*" capture="environment" data-doc="${t}" data-chofer="${c.id}"></label>
+  <label class="btn sec sm" style="cursor:pointer">📄 Subir foto o PDF<input type="file" hidden accept="image/*,application/pdf" data-doc="${t}" data-chofer="${c.id}"></label></div></div>`};
   return docsReq(c).map(t=>fila(t,true)).join('')+DOCS_OPC.map(t=>fila(t,false)).join('');
 }
 async function reduceImagen(file){
