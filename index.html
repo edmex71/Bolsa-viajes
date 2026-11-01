@@ -42,6 +42,9 @@ textarea{min-height:70px}
 .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}
 .stat{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px}
 .stat b{display:block;font-size:26px}
+button.stat{text-align:left;cursor:pointer;font:inherit;color:inherit;width:100%}
+button.stat.on{border-color:#2859c5;box-shadow:0 0 0 2px #2859c5 inset}
+tr.foco{outline:3px solid #2859c5;outline-offset:-3px}
 .inter{border-top:1px solid var(--bd);padding-top:10px;margin-top:10px}
 h2{font-size:19px;margin:18px 0 8px}
 dialog{border:1px solid var(--bd);border-radius:16px;background:var(--card);color:var(--tx);width:min(92vw,400px);padding:18px}
@@ -93,7 +96,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 16:05</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 16:30</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -253,6 +256,7 @@ async function render(){
     else if(S.view==='perfil')app.innerHTML=vistaPerfil();
     else if(S.view==='admin'){app.innerHTML='<p class="empty">Cargando…</p>';app.innerHTML=await vistaAdmin()}
   }catch(e){app.innerHTML=`<p class="empty bad">Error: ${esc(e.message)}</p>`}
+  if(S.focusRow){const tr=document.querySelector(`tr[data-row="${S.focusRow}"]`);S.focusRow=null;if(tr){tr.classList.add('foco');tr.scrollIntoView({block:'center'})}}
 }
 
 function vistaViajes(){
@@ -314,19 +318,23 @@ async function vistaAdmin(){
 }
 async function resumen(data){
   const h=hoy();const lim=new Date(h+'T12:00:00');lim.setDate(lim.getDate()+30);const l30=lim.toISOString().slice(0,10);
-  const c=await sb.from('choferes').select('id,nombre,licencia_vence,seguro_vence,medico_vence, choferes_admin(verificacion)');
+  const c=await sb.from('choferes').select('*, choferes_admin(verificacion), chofer_documentos(tipo)');
   const ch=c.data||[];
   const vig=data.filter(v=>v.estado==='disponible'&&(!v.fecha_carga||v.fecha_carga>=h));
   const tom=data.filter(v=>v.estado==='asignado');
   const pend=ch.filter(x=>one(x.choferes_admin)?.verificacion==='pendiente');
   const venc=ch.filter(x=>(x.licencia_vence&&x.licencia_vence<=l30)||(x.seguro_vence&&x.seguro_vence<=l30)||(x.medico_vence&&x.medico_vence<=l30));
   const nInt=v=>(v.interesados||[]).filter(i=>i.estado!=='cubierto').length;
-  let o=`<div class="stats"><div class="stat"><b>${vig.length}</b>Vigentes</div><div class="stat"><b>${tom.length}</b>Tomados</div>
-  <div class="stat"><b>${pend.length}</b>Choferes por verificar</div><div class="stat"><b>${venc.length}</b>Documentos por vencer</div></div>`;
-  o+='<h2>Viajes vigentes</h2>'+(vig.length?vig.map(v=>`<div class="card"><b>${esc(dir(v))}</b><div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${nInt(v)} interesado(s)${nInt(v)?': '+esc(nombresInt(v).join(', ')):''}</div></div>`).join(''):'<p class="empty">Ninguno.</p>');
-  o+='<h2>Viajes tomados</h2>'+(tom.length?tom.map(v=>{const a=(v.interesados||[]).find(i=>i.estado==='asignado');return `<div class="card"><b>${esc(dir(v))}</b><div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${a?esc(a.chofer?.nombre):'sin chofer registrado'}</div></div>`}).join(''):'<p class="empty">Ninguno.</p>');
-  if(pend.length)o+='<h2>Por verificar</h2>'+pend.map(x=>`<div class="card">${esc(x.nombre)}</div>`).join('');
-  if(venc.length)o+='<h2>Por vencer (30 días)</h2>'+venc.map(x=>`<div class="card"><b>${esc(x.nombre)}</b><div class="mut">Licencia: ${esc(x.licencia_vence||'—')} · Seguro: ${esc(x.seguro_vence||'—')} · Médico: ${esc(x.medico_vence||'—')}</div></div>`).join('');
+  const f=S.resFiltro;
+  const bt=(k,n,t)=>`<button type="button" class="stat ${f===k?'on':''}" data-act="resFiltro" data-v="${k}"><b>${n}</b>${t}</button>`;
+  let o=`<div class="stats">${bt('vigentes',vig.length,'Vigentes')}${bt('tomados',tom.length,'Tomados')}${bt('verificar',pend.length,'Choferes por verificar')}${bt('vencer',venc.length,'Documentos por vencer')}</div>`;
+  const vence=(x,lbl,d)=>d&&d<=l30?`<span class="tag" style="background:#fff4d6;color:#5c4300">${lbl} ${d<h?'vencido':'vence'} ${esc(d)}</span>`:'';
+  const accV=v=>`<div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap"><button type="button" class="btn sm" data-act="irTabla" data-id="${v.id}">Corregir en la Tabla</button><button type="button" class="btn sec sm" data-act="irViajes">Ver solicitudes</button></div>`;
+  const accC=x=>`<div class="row" style="margin-top:8px"><button type="button" class="btn sm" data-act="irChofer" data-id="${x.id}" data-n="${esc(x.nombre)}">Abrir chofer</button></div>`;
+  if(f==='vigentes')o+='<h2>Viajes vigentes</h2>'+(vig.length?vig.map(v=>`<div class="card"><b>${esc(dir(v))}</b><div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${nInt(v)} interesado(s)${nInt(v)?': '+esc(nombresInt(v).join(', ')):''}</div>${accV(v)}</div>`).join(''):'<p class="empty">Ninguno.</p>');
+  else if(f==='tomados')o+='<h2>Viajes tomados</h2>'+(tom.length?tom.map(v=>{const a=(v.interesados||[]).find(i=>i.estado==='asignado');return `<div class="card"><b>${esc(dir(v))}</b><div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${a?esc(a.chofer?.nombre):'sin chofer registrado'}</div>${accV(v)}</div>`}).join(''):'<p class="empty">Ninguno.</p>');
+  else if(f==='verificar')o+='<h2>Choferes por verificar</h2>'+(pend.length?pend.map(x=>{const fl=faltaChofer(x);return `<div class="card"><b>${esc(x.nombre)}</b><div class="mut">${esc(x.telefono||'')}</div>${fl.length?`<div class="tags" style="margin-top:6px">${fl.map(t=>`<span class="tag" style="background:#fff4d6;color:#5c4300">${esc(t)}</span>`).join('')}</div>`:'<div class="mut">Datos completos: falta verificarlo.</div>'}${accC(x)}</div>`}).join(''):'<p class="empty">Ninguno.</p>');
+  else if(f==='vencer')o+='<h2>Documentos por vencer (30 días)</h2>'+(venc.length?venc.map(x=>`<div class="card"><b>${esc(x.nombre)}</b><div class="tags" style="margin-top:6px">${vence(x,'Licencia',x.licencia_vence)}${vence(x,'Seguro',x.seguro_vence)}${vence(x,'Médico',x.medico_vence)}</div>${accC(x)}</div>`).join(''):'<p class="empty">Ninguno.</p>');
   return o;
 }
 function formViaje(){
@@ -568,6 +576,10 @@ const acts={
   toggleAuth:()=>{S.authMode=S.authMode==='login'?'signup':'login';pintaAuth()},
   logout:async()=>{await sb.auth.signOut();S.view='viajes';await refresh()},
   tab:async b=>{S.view=b.dataset.v;await render()},
+  resFiltro:async b=>{S.resFiltro=S.resFiltro===b.dataset.v?null:b.dataset.v;await render()},
+  irTabla:async b=>{S.sub='tabla';S.fTabla='todos';S.soloFaltan=false;S.focusRow=b.dataset.id;await render()},
+  irViajes:async()=>{S.sub='viajes';await render()},
+  irChofer:async b=>{S.sub='choferes';S.q=b.dataset.n||'';await render()},
   sub:async b=>{S.sub=b.dataset.v;await render()},
   interes:b=>registrarInteres(b.dataset.id),
   verDoc:async b=>{const u=await sb.storage.from('documentos').createSignedUrl(b.dataset.ruta,300);if(u.error)throw u.error;window.open(u.data.signedUrl,'_blank')},
