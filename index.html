@@ -92,7 +92,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 15:00</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 15:20</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -212,6 +212,7 @@ function lineas(v){
   return L;
 }
 function checks(name,opts,sel){return '<div class="checks">'+opts.map(o=>{const [val,lab]=Array.isArray(o)?o:[o,o];return `<label><input type="checkbox" name="${name}" value="${esc(val)}" ${(sel||[]).includes(val)?'checked':''}>${esc(lab)}</label>`}).join('')+'</div>'}
+function radios(name,opts,sel){const s=(sel||[])[0];return '<div class="checks">'+opts.map(o=>{const [val,lab]=Array.isArray(o)?o:[o,o];return `<label><input type="radio" name="${name}" value="${esc(val)}" ${s===val?'checked':''}>${esc(lab)}</label>`}).join('')+'</div>'}
 function vals(f,name){return [...f.querySelectorAll(`input[name="${name}"]:checked`)].map(i=>i.value)}
 function opts(list,sel,blank){return (blank?`<option value="">${esc(blank)}</option>`:'')+list.map(x=>`<option ${x===sel?'selected':''}>${esc(x)}</option>`).join('')}
 
@@ -278,10 +279,10 @@ function perfilForm(c,alta){
   <label>Estado donde estás</label><select name="estado">${opts(ESTADOS,c.estado,'Elige…')}</select>
   <div class="g2"><div><label>Licencia federal (número)</label><input name="licencia_federal" required value="${esc(c.licencia_federal)}"></div>
   <div><label>Vence la licencia</label><input name="licencia_vence" type="date" value="${esc(c.licencia_vence)}"></div></div>
-  <label>Unidad(es) que tienes</label>${checks('unidades',S.tipos,c.unidades)}
+  <label>Unidad que tienes (elige 1)</label>${radios('unidades',S.tipos,c.unidades)}
   <div class="g2"><div><label>Medida</label><select name="medida_pies">${optsMedida(c.unidades,c.medida_pies)}</select></div>
   <div><label>Placas</label><input name="placas" value="${esc(c.placas)}"></div></div>
-  <label>Equipo</label>${checks('cajas',CAJAS,c.cajas)}
+  <label>Equipo (elige 1)</label>${radios('cajas',CAJAS,c.cajas)}
   <label>Vence el seguro de la unidad</label><input name="seguro_vence" type="date" value="${esc(c.seguro_vence)}">
   <div class="g2"><div><label>Núm. de expediente médico</label><input name="expediente_medico" inputmode="numeric" value="${esc(c.expediente_medico)}" placeholder="Constancia médica"></div>
   <div><label>Vence el médico</label><input name="medico_vence" type="date" value="${esc(c.medico_vence)}"></div></div>
