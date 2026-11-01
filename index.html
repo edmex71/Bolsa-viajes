@@ -287,7 +287,7 @@ function formViaje(){
 }
 function listaAdmin(data){
   if(!data.length)return '<p class="empty">Todavía no hay viajes.</p>';
-  return data.map(v=>{
+  const card=v=>{
     const p=one(v.viajes_privado);
     const ints=(v.interesados||[]).map(i=>{
       const c=i.chofer||{};const ver=one(c.choferes_admin)?.verificacion;const autorizado=ver==='verificado'&&['aprobado','asignado'].includes(i.estado);
@@ -305,7 +305,17 @@ function listaAdmin(data){
     <button class="btn sec sm" data-act="imgSin" data-v="${v.id}">Imagen del viaje</button>
     <button class="btn sec sm" data-act="delViaje" data-id="${v.id}">Borrar</button></div>
     ${ints||'<div class="inter mut">Sin interesados todavía.</div>'}</div>`;
-  }).join('');
+  };
+  /* orden: solicitados (con chofer interesado) → sin solicitudes → asignados → cancelados */
+  const nSol=v=>(v.interesados||[]).filter(i=>i.estado!=='rechazado').length;
+  const disp=data.filter(v=>v.estado==='disponible');
+  const grupos=[
+    ['Solicitados',disp.filter(v=>nSol(v)>0).sort((x,y)=>nSol(y)-nSol(x))],
+    ['Sin solicitudes',disp.filter(v=>nSol(v)===0)],
+    ['Asignados',data.filter(v=>v.estado==='asignado')],
+    ['Cancelados',data.filter(v=>v.estado==='cancelado')]
+  ].filter(g=>g[1].length);
+  return grupos.map(g=>`<h2>${g[0]} (${g[1].length})</h2>`+g[1].map(card).join('')).join('');
 }
 async function vistaChoferes(){
   const {data,error}=await sb.from('choferes').select('*, choferes_admin(*), interesados(id,estado,viaje:viajes(origen_ciudad,destino_ciudad,fecha_carga,estado))').order('created_at',{ascending:false});
