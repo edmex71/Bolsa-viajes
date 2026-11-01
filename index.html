@@ -92,7 +92,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 13:45</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 14:30</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -128,6 +128,43 @@ const nn=v=>{v=(v??'').toString().trim();return v===''?null:v};
 const num=v=>{v=nn(v);return v===null?null:Number(v)};
 /* asignar solo desde la solicitud del chofer: el viaje no ofrece 'asignado' a mano */
 const nombresInt=v=>(v.interesados||[]).filter(i=>i.estado!=='cubierto').map(i=>(i.chofer&&i.chofer.nombre)||'—');
+/* ---------- documentos del chofer ---------- */
+const DOCS={licencia:'Licencia federal',ine:'INE',tc_unidad:'Tarjeta de circulación de la unidad (tracto, torton o camioneta)',tc_caja:'Tarjeta de circulación de la caja o plana',seguro:'Seguro de la unidad',medico:'Constancia médica'};
+const DOCS_CORTO={licencia:'Licencia (archivo)',ine:'INE',tc_unidad:'Tarjeta de circulación de la unidad',tc_caja:'Tarjeta de circulación de la caja/plana',seguro:'Seguro',medico:'Constancia médica'};
+const DOCS_OPC=['seguro','medico'];
+const docsReq=c=>['licencia','ine','tc_unidad'].concat((c&&c.unidades||[]).includes('Tracto')?['tc_caja']:[]);
+const docsMap=l=>Object.fromEntries((l||[]).map(d=>[d.tipo,d]));
+function docsHtml(c,map){
+  const fila=(t,req)=>{const d=map[t];return `<div class="row sp" style="padding:8px 0;border-top:1px solid #e4e7ec"><div><b>${esc(DOCS[t])}</b><div class="mut">${d?'✓ Subido':(req?'Falta':'Opcional')}</div></div>
+  <div class="row">${d?`<button type="button" class="btn sec sm" data-act="verDoc" data-ruta="${esc(d.ruta)}">Ver</button>`:''}<label class="btn sec sm" style="cursor:pointer">${d?'Reemplazar':'Subir'}<input type="file" hidden accept="image/*,application/pdf" data-doc="${t}" data-chofer="${c.id}"></label></div></div>`};
+  return docsReq(c).map(t=>fila(t,true)).join('')+DOCS_OPC.map(t=>fila(t,false)).join('');
+}
+async function reduceImagen(file){
+  if(!file.type.startsWith('image/'))return file;
+  try{
+    const bmp=await createImageBitmap(file);const s=Math.min(1,1600/Math.max(bmp.width,bmp.height));
+    const c=document.createElement('canvas');c.width=Math.round(bmp.width*s);c.height=Math.round(bmp.height*s);c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
+    const b=await new Promise(r=>c.toBlob(r,'image/jpeg',0.82));return b||file;
+  }catch(e){return file}
+}
+async function subeDoc(inp){
+  const file=inp.files&&inp.files[0];if(!file)return;
+  const tipo=inp.dataset.doc,cid=inp.dataset.chofer;
+  try{
+    if(!(file.type.startsWith('image/')||file.type==='application/pdf'))throw new Error('Sube una foto o un PDF');
+    toast('Subiendo…');
+    const blob=await reduceImagen(file);const esPdf=file.type==='application/pdf';
+    if(blob.size>8*1024*1024)throw new Error('El archivo pesa más de 8 MB');
+    const ext=esPdf?'pdf':'jpg',ruta=`${cid}/${tipo}.${ext}`;
+    const up=await sb.storage.from('documentos').upload(ruta,blob,{upsert:true,contentType:esPdf?'application/pdf':(blob.type||'image/jpeg')});if(up.error)throw up.error;
+    const ant=await sb.from('chofer_documentos').select('ruta').eq('chofer_id',cid).eq('tipo',tipo).maybeSingle();
+    const r=await sb.from('chofer_documentos').upsert({chofer_id:cid,tipo,ruta,nombre_archivo:file.name},{onConflict:'chofer_id,tipo'});if(r.error)throw r.error;
+    if(ant.data&&ant.data.ruta&&ant.data.ruta!==ruta)await sb.storage.from('documentos').remove([ant.data.ruta]);
+    toast('Documento guardado');
+    if(S.chofer&&S.chofer.id===cid){const d=await sb.from('chofer_documentos').select('tipo,ruta,nombre_archivo').eq('chofer_id',cid);S.misDocs=docsMap(d.data)}
+    await render();
+  }catch(e){toast(e.message||'No se pudo subir',true)}
+}
 /* datos/documentos que le faltan a un chofer */
 function faltaChofer(c){
   const f=[],hoy0=hoy();
@@ -143,6 +180,8 @@ function faltaChofer(c){
   if(!c.medico_vence)f.push('Vencimiento del médico');
   else if(c.medico_vence<hoy0)f.push('Médico vencido');
   if(vacioT(c.clabe))f.push('Cuenta (CLABE o tarjeta)');
+  const dm=docsMap(c.chofer_documentos);
+  docsReq(c).forEach(t=>{if(!dm[t])f.push('Falta: '+DOCS_CORTO[t])});
   return f;
 }
 const estOpts=cur=>cur==='asignado'?['asignado','disponible','cancelado']:['disponible','cancelado'];
@@ -185,7 +224,7 @@ async function refresh(){
     S.admin=!!a.data;
     const c=await sb.from('choferes').select('*').eq('user_id',S.user.id).maybeSingle();
     S.chofer=c.data||null;
-    if(S.chofer){const i=await sb.from('interesados').select('viaje_id').eq('chofer_id',S.chofer.id);S.mine=new Set((i.data||[]).map(x=>x.viaje_id))}
+    if(S.chofer){const i=await sb.from('interesados').select('viaje_id').eq('chofer_id',S.chofer.id);S.mine=new Set((i.data||[]).map(x=>x.viaje_id));const dd=await sb.from('chofer_documentos').select('tipo,ruta,nombre_archivo').eq('chofer_id',S.chofer.id);S.misDocs=docsMap(dd.data)}
   }
   await cargarViajes();
   await render();
@@ -253,7 +292,7 @@ function perfilForm(c,alta){
   <button class="btn full" type="submit">${alta?'Dar de alta chofer':'Guardar mi perfil'}</button></form>`;
 }
 function vistaPerfil(){
-  return `<div class="card"><h3>Mi perfil de chofer</h3><p class="mut">${S.chofer?'Tus datos solo los ves tú y el administrador.':'Completa tus datos una sola vez. Con ellos podrás registrarte en los viajes.'}</p>${perfilForm(S.chofer,false)}</div>`;
+  return `<div class="card"><h3>Mi perfil de chofer</h3><p class="mut">${S.chofer?'Tus datos solo los ves tú y el administrador.':'Completa tus datos una sola vez. Con ellos podrás registrarte en los viajes.'}</p>${perfilForm(S.chofer,false)}</div>${S.chofer?`<div class="card"><h3>Mis documentos</h3><p class="mut">Sube una foto o PDF de cada documento. Solo los ven tú y el administrador.</p>${docsHtml(S.chofer,S.misDocs||{})}</div>`:''}`;
 }
 
 /* ---------- administrador ---------- */
@@ -345,7 +384,7 @@ function listaAdmin(data){
   return grupos.map(g=>`<h2>${g[0]} (${g[1].length})</h2>`+g[1].map(card).join('')).join('');
 }
 async function vistaChoferes(){
-  const {data,error}=await sb.from('choferes').select('*, choferes_admin(*), interesados(id,estado,viaje:viajes(origen_ciudad,destino_ciudad,fecha_carga,estado))').order('created_at',{ascending:false});
+  const {data,error}=await sb.from('choferes').select('*, choferes_admin(*), chofer_documentos(tipo,ruta,nombre_archivo), interesados(id,estado,viaje:viajes(origen_ciudad,destino_ciudad,fecha_carga,estado))').order('created_at',{ascending:false});
   if(error)throw error;
   const q=S.q.toLowerCase();
   const list=(data||[]).filter(c=>!q||(c.nombre+' '+c.licencia_federal+' '+c.telefono).toLowerCase().includes(q));
@@ -362,6 +401,7 @@ async function vistaChoferes(){
     <div class="row" style="margin-top:8px"><select data-chg="verif" data-id="${c.id}" style="width:auto">${['pendiente','verificado','rechazado'].map(e=>`<option ${a.verificacion===e?'selected':''}>${e}</option>`).join('')}</select>
     <span class="mut">${a.verificado_en?'Verificado el '+esc(a.verificado_en):''}</span></div>
     ${(()=>{const f=faltaChofer(c);return f.length?`<div style="margin-top:8px"><span class="badge warn">Faltan ${f.length}</span><div class="tags" style="margin-top:6px">${f.map(x=>`<span class="tag" style="background:#fff4d6;color:#5c4300">${esc(x)}</span>`).join('')}</div></div>`:'<div style="margin-top:8px"><span class="badge ok">Datos completos</span></div>'})()}
+    <details style="margin-top:10px"><summary><b>Documentos</b> (${docsReq(c).filter(t=>docsMap(c.chofer_documentos)[t]).length}/${docsReq(c).length} requeridos)</summary>${docsHtml(c,docsMap(c.chofer_documentos))}</details>
     <div class="mut" style="margin-top:8px"><b>Viajes que eligió:</b></div>
     ${(c.interesados||[]).length?(c.interesados||[]).map(i=>{const w=i.viaje||{};return `<div class="mut">• ${esc((w.origen_ciudad||'?')+' → '+(w.destino_ciudad||'—'))} · ${esc(fmtFecha(w.fecha_carga))} · <b>${esc(EST_INT[i.estado]||i.estado)}</b></div>`}).join(''):'<div class="mut">Ninguno todavía.</div>'}
     <label>Notas tuyas (el chofer no las ve)</label><textarea data-notas="${c.id}">${esc(a.notas||'')}</textarea>
@@ -526,6 +566,7 @@ const acts={
   tab:async b=>{S.view=b.dataset.v;await render()},
   sub:async b=>{S.sub=b.dataset.v;await render()},
   interes:b=>registrarInteres(b.dataset.id),
+  verDoc:async b=>{const u=await sb.storage.from('documentos').createSignedUrl(b.dataset.ruta,300);if(u.error)throw u.error;window.open(u.data.signedUrl,'_blank')},
   quitaInteres:async b=>{
     if(!confirm('¿Quitar tu interés en este viaje?'))return;
     const d=await sb.from('interesados').delete().eq('viaje_id',b.dataset.id).eq('chofer_id',S.chofer.id).select('id');
@@ -658,6 +699,7 @@ document.addEventListener('click',async e=>{
   const b=e.target.closest('[data-act]');if(!b)return;
   try{await acts[b.dataset.act]?.(b)}catch(err){toast(err.message||'Error',true)}
 });
+document.addEventListener('change',e=>{const f=e.target.closest&&e.target.closest('input[data-doc]');if(f)subeDoc(f)});
 document.addEventListener('change',async e=>{
   const s=e.target;
   if(s.name==='cajas'){const f=s.closest('form');const t=f.querySelector('#tempBox');if(t)t.hidden=!vals(f,'cajas').includes('termo');return}
