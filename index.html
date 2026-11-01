@@ -92,7 +92,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 31 oct 2026 · 23:50</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 31 oct 2026 · 00:20</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -294,14 +294,14 @@ function listaAdmin(data){
   const card=v=>{
     const p=one(v.viajes_privado);
     const ints=(v.interesados||[]).map(i=>{
-      const c=i.chofer||{};const ver=one(c.choferes_admin)?.verificacion;const autorizado=ver==='verificado'&&['aprobado','asignado'].includes(i.estado);
+      const c=i.chofer||{};const ver=one(c.choferes_admin)?.verificacion;const verif=ver==='verificado';
       return `<div class="inter"><div class="row sp"><b>${esc(c.nombre)}</b><span class="badge ${ver==='verificado'?'ok':'warn'}">${esc(ver||'pendiente')}</span></div>
       <div class="mut">${esc(c.telefono)} · ${esc([c.ciudad,c.estado].filter(Boolean).join(', '))} · Lic. ${esc(c.licencia_federal)}</div>
       <div class="row" style="margin-top:8px"><select data-chg="intEstado" data-id="${i.id}" data-viaje="${v.id}" style="width:auto">${Object.entries(EST_INT).map(([k,t])=>`<option value="${k}" ${i.estado===k?'selected':''}>${t}</option>`).join('')}</select>
-      <button class="btn sec sm" data-act="wa" data-v="${v.id}" data-tel="${esc(c.telefono)}" data-ok="${autorizado?1:0}">WhatsApp</button>
+      <button class="btn sec sm" data-act="wa" data-v="${v.id}" data-tel="${esc(c.telefono)}" data-ver="${verif?1:0}">WhatsApp</button>
       <button class="btn sec sm" data-act="quitaInt" data-id="${i.id}">Quitar</button>
-      ${autorizado?`<button class="btn sec sm" data-act="img" data-v="${v.id}" data-ok="1">Imagen con precio</button>`:''}</div>
-      ${autorizado?'':'<div class="mut" style="margin-top:6px">La imagen con precio se habilita cuando el chofer esté <b>verificado</b> y su solicitud <b>aprobada</b>.</div>'}</div>`;
+      <button class="btn sec sm" data-act="img" data-v="${v.id}" data-ver="${verif?1:0}">Imagen con precio</button></div>
+      ${verif?'':'<div class="mut" style="margin-top:6px">Este chofer aún no está verificado: la imagen lleva la nota de que debe completar su registro y documentos.</div>'}</div>`;
     }).join('');
     const ns=nombresInt(v);
     return `<div class="card"><div class="row sp"><h3>${esc(dir(v))}</h3></div>
@@ -430,6 +430,10 @@ async function guardaViaje(id,upd){
 async function celda(el){
   const id=el.dataset.id,f=el.dataset.cell,v=el.value;const r=S.rows.find(x=>x.id===id);
   try{
+    if(f==='precio'||f==='precio_ofrecido'){
+      const n=num(v),of=f==='precio_ofrecido'?n:num(r.precio_ofrecido),co=f==='precio'?n:num(r.precio);
+      if(of!==null&&co!==null&&of>co){el.value=r[f]??'';toast('El precio ofrecido no puede ser mayor al precio a cobrar',true);return}
+    }
     if(f==='precio'||f==='contacto'){
       const val=f==='precio'?num(v):(v||'').trim()||null;
       const u=await sb.from('viajes_privado').upsert({viaje_id:id,[f]:val},{onConflict:'viaje_id'});if(u.error)throw u.error;
@@ -525,10 +529,9 @@ const acts={
     if(error)throw error;await refresh();
   },
   wa:async b=>{const v=await viajeAdmin(b.dataset.v);let tel=(b.dataset.tel||'').replace(/\D/g,'');if(tel.length===10)tel='52'+tel;
-    /* se manda la imagen del viaje; con precio solo si el chofer está verificado y aprobado */
-    toast(b.dataset.ok==='1'?'Elige WhatsApp y el chat del chofer':'Imagen sin precio: el chofer aún no está autorizado');
-    await imagenViaje(v,null,b.dataset.ok!=='1',tel)},
-  img:async b=>{if(b.dataset.ok!=='1'){toast('Primero verifica al chofer y aprueba su solicitud',true);return}const v=await viajeAdmin(b.dataset.v);await imagenViaje(v,one(v.viajes_privado))}
+    toast('Elige WhatsApp y el chat del chofer');
+    await imagenViaje(v,null,false,tel,b.dataset.ver!=='1')},
+  img:async b=>{const v=await viajeAdmin(b.dataset.v);await imagenViaje(v,null,false,null,b.dataset.ver!=='1')}
 };
 async function viajeAdmin(id){const d=await datosAdmin();return d.find(v=>v.id===id)}
 const changes={
@@ -585,6 +588,7 @@ const forms={
   viaje:async f=>{
     const g=n=>f.elements[n]?.value;const cajas=vals(f,'cajas');
     const fp=nn(g('forma_pago'));
+    {const o=num(g('precio_ofrecido')),c=num(g('precio'));if(o!==null&&c!==null&&o>c)throw new Error('El precio ofrecido no puede ser mayor al precio a cobrar')}
     const row={origen_ciudad:nn(g('origen_ciudad')),origen_estado:g('origen_estado'),destino_ciudad:nn(g('destino_ciudad')),destino_estado:nn(g('destino_estado')),
       fecha_carga:nn(g('fecha_carga')),horario_carga:nn(g('horario_carga')),unidades:vals(f,'unidades'),cajas,medida_pies:nn(g('medida_pies')),precio_ofrecido:num(g('precio_ofrecido')),
       temperatura_c:cajas.includes('termo')?num(g('temperatura_c')):null,peso_ton_min:num(g('peso_ton_min')),peso_ton_max:num(g('peso_ton_max')),
@@ -600,9 +604,10 @@ const forms={
 };
 
 /* ---------- imagen para WhatsApp ---------- */
-async function imagenViaje(v,p,sinPrecio,tel){
-  const c=document.createElement('canvas');c.width=1080;c.height=1350;const x=c.getContext('2d');
-  x.fillStyle='#fff';x.fillRect(0,0,1080,1350);x.fillStyle='#0b5ed7';x.fillRect(0,0,1080,150);
+const NOTA_REGISTRO='Para poder asignarte el viaje debes completar tu registro, enviar tus documentos y ser verificado por un administrador.';
+async function imagenViaje(v,p,sinPrecio,tel,nota){
+  const H=nota?1620:1350;const c=document.createElement('canvas');c.width=1080;c.height=H;const x=c.getContext('2d');
+  x.fillStyle='#fff';x.fillRect(0,0,1080,H);x.fillStyle='#0b5ed7';x.fillRect(0,0,1080,150);
   x.fillStyle='#fff';x.font='bold 56px sans-serif';x.fillText("Transporte D'Leon",50,96);
   let y=230;
   const wrap=(t,w)=>{const out=[];let ln='';for(const wd of String(t).split(' ')){const test=ln?ln+' '+wd:wd;if(x.measureText(test).width>w&&ln){out.push(ln);ln=wd}else ln=test}if(ln)out.push(ln);return out};
@@ -613,8 +618,10 @@ async function imagenViaje(v,p,sinPrecio,tel){
     for(const ln of wrap(val,980)){x.fillText(ln,50,y);y+=54}
     y+=22;if(y>1150)break;
   }
-  if(!sinPrecio&&v.precio_ofrecido!=null){x.fillStyle='#16794c';x.fillRect(0,1190,1080,160);x.fillStyle='#fff';x.font='bold 74px sans-serif';
-    x.fillText('$'+Number(v.precio_ofrecido).toLocaleString('es-MX')+' MXN',50,1295)}
+  if(nota){x.fillStyle='#fff4d6';x.fillRect(30,1200,1020,240);x.strokeStyle='#e0a800';x.lineWidth=4;x.strokeRect(30,1200,1020,240);
+    x.fillStyle='#5c4300';x.font='bold 36px sans-serif';let ny=1255;for(const ln of wrap(NOTA_REGISTRO,940)){x.fillText(ln,60,ny);ny+=50}}
+  if(!sinPrecio&&v.precio_ofrecido!=null){x.fillStyle='#16794c';x.fillRect(0,H-160,1080,160);x.fillStyle='#fff';x.font='bold 74px sans-serif';
+    x.fillText('$'+Number(v.precio_ofrecido).toLocaleString('es-MX')+' MXN',50,H-55)}
   const blob=await new Promise(r=>c.toBlob(r,'image/png'));
   const file=new File([blob],'viaje.png',{type:'image/png'});
   const baja=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='viaje.png';a.click();
