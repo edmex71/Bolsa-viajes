@@ -92,7 +92,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 13:30</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 13:45</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -128,6 +128,23 @@ const nn=v=>{v=(v??'').toString().trim();return v===''?null:v};
 const num=v=>{v=nn(v);return v===null?null:Number(v)};
 /* asignar solo desde la solicitud del chofer: el viaje no ofrece 'asignado' a mano */
 const nombresInt=v=>(v.interesados||[]).filter(i=>i.estado!=='cubierto').map(i=>(i.chofer&&i.chofer.nombre)||'—');
+/* datos/documentos que le faltan a un chofer */
+function faltaChofer(c){
+  const f=[],hoy0=hoy();
+  const vacioT=x=>!x||!String(x).trim()||/^por completar$/i.test(String(x).trim());
+  if(vacioT(c.telefono))f.push('Teléfono');
+  if(!c.licencia_vence)f.push('Vencimiento de licencia');
+  else if(c.licencia_vence<hoy0)f.push('Licencia vencida');
+  if(!(c.unidades||[]).length)f.push('Unidad');
+  if(vacioT(c.placas))f.push('Placas');
+  if(!c.seguro_vence)f.push('Seguro (vencimiento)');
+  else if(c.seguro_vence<hoy0)f.push('Seguro vencido');
+  if(vacioT(c.expediente_medico))f.push('Expediente médico');
+  if(!c.medico_vence)f.push('Vencimiento del médico');
+  else if(c.medico_vence<hoy0)f.push('Médico vencido');
+  if(vacioT(c.clabe))f.push('Cuenta (CLABE o tarjeta)');
+  return f;
+}
 const estOpts=cur=>cur==='asignado'?['asignado','disponible','cancelado']:['disponible','cancelado'];
 const hoy=()=>new Date().toLocaleDateString('en-CA',{timeZone:'America/Mexico_City'});
 function toast(m,bad){const t=$('#toast');t.textContent=m;t.className=bad?'bad':'';t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',4200)}
@@ -344,6 +361,7 @@ async function vistaChoferes(){
     <div class="mut">${esc(c.banco||'')} ${esc(c.titular||'')} ${c.clabe?(c.clabe.length===16?'Tarjeta ':'CLABE ')+esc(c.clabe):''}</div>
     <div class="row" style="margin-top:8px"><select data-chg="verif" data-id="${c.id}" style="width:auto">${['pendiente','verificado','rechazado'].map(e=>`<option ${a.verificacion===e?'selected':''}>${e}</option>`).join('')}</select>
     <span class="mut">${a.verificado_en?'Verificado el '+esc(a.verificado_en):''}</span></div>
+    ${(()=>{const f=faltaChofer(c);return f.length?`<div style="margin-top:8px"><span class="badge warn">Faltan ${f.length}</span><div class="tags" style="margin-top:6px">${f.map(x=>`<span class="tag" style="background:#fff4d6;color:#5c4300">${esc(x)}</span>`).join('')}</div></div>`:'<div style="margin-top:8px"><span class="badge ok">Datos completos</span></div>'})()}
     <div class="mut" style="margin-top:8px"><b>Viajes que eligió:</b></div>
     ${(c.interesados||[]).length?(c.interesados||[]).map(i=>{const w=i.viaje||{};return `<div class="mut">• ${esc((w.origen_ciudad||'?')+' → '+(w.destino_ciudad||'—'))} · ${esc(fmtFecha(w.fecha_carga))} · <b>${esc(EST_INT[i.estado]||i.estado)}</b></div>`}).join(''):'<div class="mut">Ninguno todavía.</div>'}
     <label>Notas tuyas (el chofer no las ve)</label><textarea data-notas="${c.id}">${esc(a.notas||'')}</textarea>
