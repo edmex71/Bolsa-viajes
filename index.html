@@ -126,6 +126,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const nn=v=>{v=(v??'').toString().trim();return v===''?null:v};
 const num=v=>{v=nn(v);return v===null?null:Number(v)};
 /* asignar solo desde la solicitud del chofer: el viaje no ofrece 'asignado' a mano */
+const nombresInt=v=>(v.interesados||[]).filter(i=>i.estado!=='rechazado').map(i=>(i.chofer&&i.chofer.nombre)||'—');
 const estOpts=cur=>cur==='asignado'?['asignado','disponible','cancelado']:['disponible','cancelado'];
 const hoy=()=>new Date().toLocaleDateString('en-CA',{timeZone:'America/Mexico_City'});
 function toast(m,bad){const t=$('#toast');t.textContent=m;t.className=bad?'bad':'';t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',4200)}
@@ -259,7 +260,7 @@ async function resumen(data){
   const nInt=v=>(v.interesados||[]).filter(i=>i.estado!=='rechazado').length;
   let o=`<div class="stats"><div class="stat"><b>${vig.length}</b>Vigentes</div><div class="stat"><b>${tom.length}</b>Tomados</div>
   <div class="stat"><b>${pend.length}</b>Choferes por verificar</div><div class="stat"><b>${venc.length}</b>Documentos por vencer</div></div>`;
-  o+='<h2>Viajes vigentes</h2>'+(vig.length?vig.map(v=>`<div class="card"><b>${esc(dir(v))}</b><div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${nInt(v)} interesado(s)</div></div>`).join(''):'<p class="empty">Ninguno.</p>');
+  o+='<h2>Viajes vigentes</h2>'+(vig.length?vig.map(v=>`<div class="card"><b>${esc(dir(v))}</b><div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${nInt(v)} interesado(s)${nInt(v)?': '+esc(nombresInt(v).join(', ')):''}</div></div>`).join(''):'<p class="empty">Ninguno.</p>');
   o+='<h2>Viajes tomados</h2>'+(tom.length?tom.map(v=>{const a=(v.interesados||[]).find(i=>i.estado==='asignado');return `<div class="card"><b>${esc(dir(v))}</b><div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${a?esc(a.chofer?.nombre):'sin chofer registrado'}</div></div>`}).join(''):'<p class="empty">Ninguno.</p>');
   if(pend.length)o+='<h2>Por verificar</h2>'+pend.map(x=>`<div class="card">${esc(x.nombre)}</div>`).join('');
   if(venc.length)o+='<h2>Por vencer (30 días)</h2>'+venc.map(x=>`<div class="card"><b>${esc(x.nombre)}</b><div class="mut">Licencia: ${esc(x.licencia_vence||'—')} · Seguro: ${esc(x.seguro_vence||'—')}</div></div>`).join('');
@@ -301,12 +302,14 @@ function listaAdmin(data){
       ${autorizado?`<button class="btn sec sm" data-act="img" data-v="${v.id}" data-ok="1">Imagen con precio</button>`:''}</div>
       ${autorizado?'':'<div class="mut" style="margin-top:6px">La imagen con precio se habilita cuando el chofer esté <b>verificado</b> y su solicitud <b>aprobada</b>.</div>'}</div>`;
     }).join('');
+    const ns=nombresInt(v);
     return `<div class="card"><div class="row sp"><h3>${esc(dir(v))}</h3></div>
+    <div style="margin:6px 0"><span class="badge ${ns.length?'ok':'warn'}">${ns.length?ns.length+' interesado(s)':'Sin interesados'}</span>${ns.length?' <b>'+esc(ns.join(', '))+'</b>':''}</div>
     <div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${esc(pagoTxt(v))} · Ofrecido: <b>${v.precio_ofrecido!=null?'$'+Number(v.precio_ofrecido).toLocaleString('es-MX'):'—'}</b> · Contacto: <b>${esc(p&&p.contacto||'—')}</b> · A cobrar: <b>${p&&p.precio!=null?'$'+Number(p.precio).toLocaleString('es-MX')+' '+esc(p.moneda):'—'}</b></div>
     <div class="row" style="margin-top:8px"><select data-chg="viajeEstado" data-id="${v.id}" style="width:auto">${estOpts(v.estado).map(e=>`<option ${v.estado===e?'selected':''}>${e}</option>`).join('')}</select>
     <button class="btn sec sm" data-act="imgSin" data-v="${v.id}">Imagen del viaje con precio</button>
     <button class="btn sec sm" data-act="delViaje" data-id="${v.id}">Borrar</button></div>
-    ${ints||'<div class="inter mut">Sin interesados todavía.</div>'}</div>`;
+    ${ints?'<div class="mut" style="margin-top:10px"><b>Choferes interesados en este viaje:</b></div>'+ints:'<div class="inter mut">Sin interesados todavía.</div>'}</div>`;
   };
   /* orden: solicitados (con chofer interesado) → sin solicitudes → asignados → cancelados */
   const nSol=v=>(v.interesados||[]).filter(i=>i.estado!=='rechazado').length;
