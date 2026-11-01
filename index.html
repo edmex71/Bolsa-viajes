@@ -400,10 +400,15 @@ async function vistaTabla(){
   if(error)throw error;
   S.rows=(data||[]).map(r=>({...r,precio:one(r.viajes_privado)?.precio??null,contacto:one(r.viajes_privado)?.contacto??''}));
   const falt=S.rows.filter(r=>nFaltan(r)>0).length;
-  const lista=S.soloFaltan?S.rows.filter(r=>nFaltan(r)>0):S.rows;
+  const h0=hoy();const esVenc=r=>r.estado==='disponible'&&r.fecha_carga&&r.fecha_carga<h0;
+  const FT={todos:()=>true,vigentes:r=>r.estado==='asignado'||(r.estado==='disponible'&&!esVenc(r)),vencidos:esVenc,asignados:r=>r.estado==='asignado',cancelados:r=>r.estado==='cancelado'};
+  const ft=S.fTabla||'todos';
+  const lista=S.rows.filter(FT[ft]||FT.todos).filter(r=>!S.soloFaltan||nFaltan(r)>0);
+  const nv=S.rows.filter(esVenc).length;
   const nCan=S.rows.filter(r=>r.estado==='cancelado').length;
   const heads=['Origen: ciudad','Origen: estado','Destino: ciudad','Destino: estado','Fecha de carga','Horario','Unidad','Equipo','Medida (pies)','Temp. °C','Peso mín (ton)','Peso máx (ton)','Tarimas','Mercancía','Ida y vuelta','Requerimientos','Notas','Forma de pago','Días crédito','Precio ofrecido (público)','Precio a cobrar (solo admin)','Contacto (solo admin)','Estado','Repetido a propósito',''];
   return `<div class="row sp"><button class="btn sm" data-act="filaNueva">+ Agregar viaje</button>${nCan?`<button class="btn sec sm" data-act="delCanceladas">Borrar ${nCan} cancelados</button>`:''}
+  <select data-chg="fTabla" style="width:auto"><option value="todos" ${ft==='todos'?'selected':''}>Ver: Todos (${S.rows.length})</option><option value="vigentes" ${ft==='vigentes'?'selected':''}>Vigentes</option><option value="vencidos" ${ft==='vencidos'?'selected':''}>Vencidos (fecha de carga pasada) (${nv})</option><option value="asignados" ${ft==='asignados'?'selected':''}>Asignados</option><option value="cancelados" ${ft==='cancelados'?'selected':''}>Cancelados (${nCan})</option></select>
   <label class="row" style="margin:0;color:var(--tx)"><input type="checkbox" data-chg="soloFaltan" style="width:auto" ${S.soloFaltan?'checked':''}> Solo con datos faltantes</label></div>
   <p class="mut">${S.rows.length} viajes · ${falt} con datos por completar (celdas amarillas). Cada cambio se guarda solo al salir de la celda. Desliza hacia los lados para ver todas las columnas.</p>
   <div id="tw" class="tw"><table class="tbl"><thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${lista.map(filaHtml).join('')}</tbody></table></div>`;
@@ -522,6 +527,7 @@ const acts={
 };
 async function viajeAdmin(id){const d=await datosAdmin();return d.find(v=>v.id===id)}
 const changes={
+  fTabla:async s=>{S.fTabla=s.value;await render()},
   soloFaltan:async s=>{S.soloFaltan=s.checked;await render()},
   fOrigen:async s=>{S.fOrigen=s.value;await render()},
   fUnidad:async s=>{S.fUnidad=s.value;await render()},
