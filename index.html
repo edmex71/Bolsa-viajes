@@ -204,7 +204,7 @@ function cardViaje(v){
   const L=lineas(v);const ya=S.mine.has(v.id);
   return `<div class="card"><h3>${esc(dir(v))}</h3><div class="mut">${esc(fmtFecha(v.fecha_carga))}${v.horario_carga?' · '+esc(v.horario_carga):''}</div>
   <div class="tags">${L.filter(x=>!['Ruta','Carga'].includes(x[0])).map(x=>`<span class="tag"><b>${esc(x[0])}:</b> ${esc(x[1])}</span>`).join('')}</div>
-  <button class="btn full" data-act="interes" data-id="${v.id}" ${ya?'disabled':''}>${ya?'Ya te registraste en este viaje':'Me interesa'}</button></div>`;
+  ${ya?`<div class="mut" style="margin-top:8px">Ya te registraste en este viaje.</div><button class="btn sec full" data-act="quitaInteres" data-id="${v.id}" style="margin-top:6px">Quitar mi interés</button>`:`<button class="btn full" data-act="interes" data-id="${v.id}">Me interesa</button>`}</div>`;
 }
 
 function perfilForm(c,alta){
@@ -295,18 +295,20 @@ function listaAdmin(data){
       <div class="mut">${esc(c.telefono)} · ${esc([c.ciudad,c.estado].filter(Boolean).join(', '))} · Lic. ${esc(c.licencia_federal)}</div>
       <div class="row" style="margin-top:8px"><select data-chg="intEstado" data-id="${i.id}" data-viaje="${v.id}" style="width:auto">${Object.entries(EST_INT).map(([k,t])=>`<option value="${k}" ${i.estado===k?'selected':''}>${t}</option>`).join('')}</select>
       <button class="btn sec sm" data-act="wa" data-v="${v.id}" data-tel="${esc(c.telefono)}" data-ok="${autorizado?1:0}">WhatsApp</button>
+      <button class="btn sec sm" data-act="quitaInt" data-id="${i.id}">Quitar</button>
       ${autorizado?`<button class="btn sec sm" data-act="img" data-v="${v.id}" data-ok="1">Imagen con precio</button>`:''}</div>
       ${autorizado?'':'<div class="mut" style="margin-top:6px">La imagen con precio se habilita cuando el chofer esté <b>verificado</b> y su solicitud <b>aprobada</b>.</div>'}</div>`;
     }).join('');
     return `<div class="card"><div class="row sp"><h3>${esc(dir(v))}</h3></div>
     <div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${esc(pagoTxt(v))} · Ofrecido: <b>${v.precio_ofrecido!=null?'$'+Number(v.precio_ofrecido).toLocaleString('es-MX'):'—'}</b> · Contacto: <b>${esc(p&&p.contacto||'—')}</b> · A cobrar: <b>${p&&p.precio!=null?'$'+Number(p.precio).toLocaleString('es-MX')+' '+esc(p.moneda):'—'}</b></div>
     <div class="row" style="margin-top:8px"><select data-chg="viajeEstado" data-id="${v.id}" style="width:auto">${['disponible','asignado','cancelado'].map(e=>`<option ${v.estado===e?'selected':''}>${e}</option>`).join('')}</select>
+    <button class="btn sec sm" data-act="imgSin" data-v="${v.id}">Imagen del viaje</button>
     <button class="btn sec sm" data-act="delViaje" data-id="${v.id}">Borrar</button></div>
     ${ints||'<div class="inter mut">Sin interesados todavía.</div>'}</div>`;
   }).join('');
 }
 async function vistaChoferes(){
-  const {data,error}=await sb.from('choferes').select('*, choferes_admin(*)').order('created_at',{ascending:false});
+  const {data,error}=await sb.from('choferes').select('*, choferes_admin(*), interesados(id,estado,viaje:viajes(origen_ciudad,destino_ciudad,fecha_carga,estado))').order('created_at',{ascending:false});
   if(error)throw error;
   const q=S.q.toLowerCase();
   const list=(data||[]).filter(c=>!q||(c.nombre+' '+c.licencia_federal+' '+c.telefono).toLowerCase().includes(q));
@@ -322,6 +324,8 @@ async function vistaChoferes(){
     <div class="mut">${esc(c.banco||'')} ${esc(c.titular||'')} ${esc(c.clabe||'')}</div>
     <div class="row" style="margin-top:8px"><select data-chg="verif" data-id="${c.id}" style="width:auto">${['pendiente','verificado','rechazado'].map(e=>`<option ${a.verificacion===e?'selected':''}>${e}</option>`).join('')}</select>
     <span class="mut">${a.verificado_en?'Verificado el '+esc(a.verificado_en):''}</span></div>
+    <div class="mut" style="margin-top:8px"><b>Viajes que eligió:</b></div>
+    ${(c.interesados||[]).length?(c.interesados||[]).map(i=>{const w=i.viaje||{};return `<div class="mut">• ${esc((w.origen_ciudad||'?')+' → '+(w.destino_ciudad||'—'))} · ${esc(fmtFecha(w.fecha_carga))} · <b>${esc(EST_INT[i.estado]||i.estado)}</b></div>`}).join(''):'<div class="mut">Ninguno todavía.</div>'}
     <label>Notas tuyas (el chofer no las ve)</label><textarea data-notas="${c.id}">${esc(a.notas||'')}</textarea>
     <button class="btn sec sm" data-act="guardaNotas" data-id="${c.id}" style="margin-top:6px">Guardar notas</button></div>`;
   }).join('');
@@ -475,6 +479,17 @@ const acts={
   tab:async b=>{S.view=b.dataset.v;await render()},
   sub:async b=>{S.sub=b.dataset.v;await render()},
   interes:b=>registrarInteres(b.dataset.id),
+  quitaInteres:async b=>{
+    if(!confirm('¿Quitar tu interés en este viaje?'))return;
+    const d=await sb.from('interesados').delete().eq('viaje_id',b.dataset.id).eq('chofer_id',S.chofer.id).select('id');
+    if(d.error)throw d.error;
+    if(!d.data||!d.data.length){toast('Este viaje ya está en revisión o aprobado. Contacta al administrador.',true);return}
+    S.mine.delete(b.dataset.id);toast('Listo, quitamos tu interés');await render()},
+  quitaInt:async b=>{
+    if(!confirm('¿Quitar a este chofer de este viaje?'))return;
+    const d=await sb.from('interesados').delete().eq('id',b.dataset.id);if(d.error)throw d.error;
+    toast('Quitado');await refresh()},
+  imgSin:async b=>{const v=await viajeAdmin(b.dataset.v);await imagenViaje(v,null,true)},
   nuevoChofer:async()=>{S.nuevoChofer=!S.nuevoChofer;await render()},
   guardaNotas:async b=>{
     const t=document.querySelector(`[data-notas="${b.dataset.id}"]`).value;
@@ -560,7 +575,7 @@ const forms={
 };
 
 /* ---------- imagen para WhatsApp ---------- */
-async function imagenViaje(v,p){
+async function imagenViaje(v,p,sinPrecio){
   const c=document.createElement('canvas');c.width=1080;c.height=1350;const x=c.getContext('2d');
   x.fillStyle='#fff';x.fillRect(0,0,1080,1350);x.fillStyle='#0b5ed7';x.fillRect(0,0,1080,150);
   x.fillStyle='#fff';x.font='bold 56px sans-serif';x.fillText("Transporte D'Leon",50,96);
@@ -573,7 +588,7 @@ async function imagenViaje(v,p){
     for(const ln of wrap(val,980)){x.fillText(ln,50,y);y+=54}
     y+=22;if(y>1150)break;
   }
-  if(v.precio_ofrecido!=null){x.fillStyle='#16794c';x.fillRect(0,1190,1080,160);x.fillStyle='#fff';x.font='bold 74px sans-serif';
+  if(!sinPrecio&&v.precio_ofrecido!=null){x.fillStyle='#16794c';x.fillRect(0,1190,1080,160);x.fillStyle='#fff';x.font='bold 74px sans-serif';
     x.fillText('$'+Number(v.precio_ofrecido).toLocaleString('es-MX')+' MXN',50,1295)}
   const blob=await new Promise(r=>c.toBlob(r,'image/png'));
   const file=new File([blob],'viaje.png',{type:'image/png'});
