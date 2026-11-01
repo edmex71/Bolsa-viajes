@@ -92,7 +92,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 00:35</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 13:30</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -225,6 +225,8 @@ function perfilForm(c,alta){
   <div><label>Placas</label><input name="placas" value="${esc(c.placas)}"></div></div>
   <label>Equipo</label>${checks('cajas',CAJAS,c.cajas)}
   <label>Vence el seguro de la unidad</label><input name="seguro_vence" type="date" value="${esc(c.seguro_vence)}">
+  <div class="g2"><div><label>Núm. de expediente médico</label><input name="expediente_medico" inputmode="numeric" value="${esc(c.expediente_medico)}" placeholder="Constancia médica"></div>
+  <div><label>Vence el médico</label><input name="medico_vence" type="date" value="${esc(c.medico_vence)}"></div></div>
   <h2>Datos para depósito</h2>
   <div class="g2"><div><label>Banco</label><input name="banco" value="${esc(c.banco)}"></div>
   <div><label>Titular de la cuenta</label><input name="titular" value="${esc(c.titular)}"></div></div>
@@ -252,19 +254,19 @@ async function vistaAdmin(){
 }
 async function resumen(data){
   const h=hoy();const lim=new Date(h+'T12:00:00');lim.setDate(lim.getDate()+30);const l30=lim.toISOString().slice(0,10);
-  const c=await sb.from('choferes').select('id,nombre,licencia_vence,seguro_vence, choferes_admin(verificacion)');
+  const c=await sb.from('choferes').select('id,nombre,licencia_vence,seguro_vence,medico_vence, choferes_admin(verificacion)');
   const ch=c.data||[];
   const vig=data.filter(v=>v.estado==='disponible'&&(!v.fecha_carga||v.fecha_carga>=h));
   const tom=data.filter(v=>v.estado==='asignado');
   const pend=ch.filter(x=>one(x.choferes_admin)?.verificacion==='pendiente');
-  const venc=ch.filter(x=>(x.licencia_vence&&x.licencia_vence<=l30)||(x.seguro_vence&&x.seguro_vence<=l30));
+  const venc=ch.filter(x=>(x.licencia_vence&&x.licencia_vence<=l30)||(x.seguro_vence&&x.seguro_vence<=l30)||(x.medico_vence&&x.medico_vence<=l30));
   const nInt=v=>(v.interesados||[]).filter(i=>i.estado!=='cubierto').length;
   let o=`<div class="stats"><div class="stat"><b>${vig.length}</b>Vigentes</div><div class="stat"><b>${tom.length}</b>Tomados</div>
   <div class="stat"><b>${pend.length}</b>Choferes por verificar</div><div class="stat"><b>${venc.length}</b>Documentos por vencer</div></div>`;
   o+='<h2>Viajes vigentes</h2>'+(vig.length?vig.map(v=>`<div class="card"><b>${esc(dir(v))}</b><div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${nInt(v)} interesado(s)${nInt(v)?': '+esc(nombresInt(v).join(', ')):''}</div></div>`).join(''):'<p class="empty">Ninguno.</p>');
   o+='<h2>Viajes tomados</h2>'+(tom.length?tom.map(v=>{const a=(v.interesados||[]).find(i=>i.estado==='asignado');return `<div class="card"><b>${esc(dir(v))}</b><div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${a?esc(a.chofer?.nombre):'sin chofer registrado'}</div></div>`}).join(''):'<p class="empty">Ninguno.</p>');
   if(pend.length)o+='<h2>Por verificar</h2>'+pend.map(x=>`<div class="card">${esc(x.nombre)}</div>`).join('');
-  if(venc.length)o+='<h2>Por vencer (30 días)</h2>'+venc.map(x=>`<div class="card"><b>${esc(x.nombre)}</b><div class="mut">Licencia: ${esc(x.licencia_vence||'—')} · Seguro: ${esc(x.seguro_vence||'—')}</div></div>`).join('');
+  if(venc.length)o+='<h2>Por vencer (30 días)</h2>'+venc.map(x=>`<div class="card"><b>${esc(x.nombre)}</b><div class="mut">Licencia: ${esc(x.licencia_vence||'—')} · Seguro: ${esc(x.seguro_vence||'—')} · Médico: ${esc(x.medico_vence||'—')}</div></div>`).join('');
   return o;
 }
 function formViaje(){
@@ -338,7 +340,7 @@ async function vistaChoferes(){
     const a=one(c.choferes_admin)||{};
     return `<div class="card"><div class="row sp"><h3>${esc(c.nombre)}</h3><span class="badge ${a.verificacion==='verificado'?'ok':a.verificacion==='rechazado'?'bad':'warn'}">${esc(a.verificacion||'pendiente')}</span></div>
     <div class="mut">${esc(c.telefono)} · ${esc([c.ciudad,c.estado].filter(Boolean).join(', '))}</div>
-    <div class="tags"><span class="tag">Lic. ${esc(c.licencia_federal)} (vence ${esc(c.licencia_vence||'—')})</span><span class="tag">${esc((c.unidades||[]).join(', ')||'Sin unidad')}${c.medida_pies?' '+c.medida_pies+'\'':''}</span><span class="tag">Placas ${esc(c.placas||'—')}</span><span class="tag">Seguro vence ${esc(c.seguro_vence||'—')}</span></div>
+    <div class="tags"><span class="tag">Lic. ${esc(c.licencia_federal)} (vence ${esc(c.licencia_vence||'—')})</span><span class="tag">${esc((c.unidades||[]).join(', ')||'Sin unidad')}${c.medida_pies?' '+c.medida_pies+'\'':''}</span><span class="tag">Placas ${esc(c.placas||'—')}</span><span class="tag">Seguro vence ${esc(c.seguro_vence||'—')}</span><span class="tag">Exp. médico ${esc(c.expediente_medico||'—')} (vence ${esc(c.medico_vence||'—')})</span></div>
     <div class="mut">${esc(c.banco||'')} ${esc(c.titular||'')} ${c.clabe?(c.clabe.length===16?'Tarjeta ':'CLABE ')+esc(c.clabe):''}</div>
     <div class="row" style="margin-top:8px"><select data-chg="verif" data-id="${c.id}" style="width:auto">${['pendiente','verificado','rechazado'].map(e=>`<option ${a.verificacion===e?'selected':''}>${e}</option>`).join('')}</select>
     <span class="mut">${a.verificado_en?'Verificado el '+esc(a.verificado_en):''}</span></div>
@@ -558,7 +560,7 @@ function datosChofer(f){
   return {nombre:nn(g('nombre')),telefono:nn(g('telefono')),ciudad:nn(g('ciudad')),estado:nn(g('estado')),
     licencia_federal:nn(g('licencia_federal'))?.toUpperCase().replace(/\s+/g,''),licencia_vence:nn(g('licencia_vence')),
     unidades:vals(f,'unidades'),medida_pies:nn(g('medida_pies')),cajas:vals(f,'cajas'),placas:nn(g('placas'))?.toUpperCase(),
-    seguro_vence:nn(g('seguro_vence')),banco:nn(g('banco')),titular:nn(g('titular')),clabe};
+    seguro_vence:nn(g('seguro_vence')),expediente_medico:nn(g('expediente_medico')),medico_vence:nn(g('medico_vence')),banco:nn(g('banco')),titular:nn(g('titular')),clabe};
 }
 const forms={
   auth:async f=>{
