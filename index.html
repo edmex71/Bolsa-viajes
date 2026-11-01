@@ -125,6 +125,8 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const nn=v=>{v=(v??'').toString().trim();return v===''?null:v};
 const num=v=>{v=nn(v);return v===null?null:Number(v)};
+/* asignar solo desde la solicitud del chofer: el viaje no ofrece 'asignado' a mano */
+const estOpts=cur=>cur==='asignado'?['asignado','disponible','cancelado']:['disponible','cancelado'];
 const hoy=()=>new Date().toLocaleDateString('en-CA',{timeZone:'America/Mexico_City'});
 function toast(m,bad){const t=$('#toast');t.textContent=m;t.className=bad?'bad':'';t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',4200)}
 function fmtFecha(f){if(!f)return 'Fecha por definir';return new Date(f+'T12:00:00').toLocaleDateString('es-MX',{weekday:'short',day:'numeric',month:'short'})}
@@ -301,18 +303,20 @@ function listaAdmin(data){
     }).join('');
     return `<div class="card"><div class="row sp"><h3>${esc(dir(v))}</h3></div>
     <div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${esc(pagoTxt(v))} · Ofrecido: <b>${v.precio_ofrecido!=null?'$'+Number(v.precio_ofrecido).toLocaleString('es-MX'):'—'}</b> · Contacto: <b>${esc(p&&p.contacto||'—')}</b> · A cobrar: <b>${p&&p.precio!=null?'$'+Number(p.precio).toLocaleString('es-MX')+' '+esc(p.moneda):'—'}</b></div>
-    <div class="row" style="margin-top:8px"><select data-chg="viajeEstado" data-id="${v.id}" style="width:auto">${['disponible','asignado','cancelado'].map(e=>`<option ${v.estado===e?'selected':''}>${e}</option>`).join('')}</select>
+    <div class="row" style="margin-top:8px"><select data-chg="viajeEstado" data-id="${v.id}" style="width:auto">${estOpts(v.estado).map(e=>`<option ${v.estado===e?'selected':''}>${e}</option>`).join('')}</select>
     <button class="btn sec sm" data-act="imgSin" data-v="${v.id}">Imagen del viaje con precio</button>
     <button class="btn sec sm" data-act="delViaje" data-id="${v.id}">Borrar</button></div>
     ${ints||'<div class="inter mut">Sin interesados todavía.</div>'}</div>`;
   };
   /* orden: solicitados (con chofer interesado) → sin solicitudes → asignados → cancelados */
   const nSol=v=>(v.interesados||[]).filter(i=>i.estado!=='rechazado').length;
-  const disp=data.filter(v=>v.estado==='disponible');
+  const h0=hoy();const venc=v=>v.fecha_carga&&v.fecha_carga<h0;
+  const disp=data.filter(v=>v.estado==='disponible'&&!venc(v));
   const grupos=[
     ['Solicitados',disp.filter(v=>nSol(v)>0).sort((x,y)=>nSol(y)-nSol(x))],
     ['Sin solicitudes',disp.filter(v=>nSol(v)===0)],
     ['Asignados',data.filter(v=>v.estado==='asignado')],
+    ['Vencidos (fecha de carga pasada)',data.filter(v=>v.estado==='disponible'&&venc(v))],
     ['Cancelados',data.filter(v=>v.estado==='cancelado')]
   ].filter(g=>g[1].length);
   return grupos.map(g=>`<h2>${g[0]} (${g[1].length})</h2>`+g[1].map(card).join('')).join('');
@@ -387,7 +391,7 @@ function filaHtml(r){
   <td>${inp(r,'precio_ofrecido','number','step="0.01" placeholder="MXN"')}</td>
   ${cel(r,'precio',inp(r,'precio','number','step="0.01" placeholder="MXN"'))}
   <td>${inp(r,'contacto','text','placeholder="Nombre / empresa / tel."')}</td>
-  <td><select data-cell="estado" data-id="${r.id}">${['disponible','asignado','cancelado'].map(e=>`<option ${r.estado===e?'selected':''}>${e}</option>`).join('')}</select></td>
+  <td><select data-cell="estado" data-id="${r.id}">${estOpts(r.estado).map(e=>`<option ${r.estado===e?'selected':''}>${e}</option>`).join('')}</select></td>
   <td style="text-align:center"><input type="checkbox" data-cell="permitir_repetido" data-id="${r.id}" ${r.permitir_repetido?'checked':''} style="width:auto;min-width:0;margin:12px"></td>
   <td><button type="button" class="cellbtn" data-act="delFila" data-id="${r.id}">Borrar</button></td></tr>`;
 }
