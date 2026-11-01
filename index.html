@@ -302,7 +302,7 @@ function listaAdmin(data){
     return `<div class="card"><div class="row sp"><h3>${esc(dir(v))}</h3></div>
     <div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${esc(pagoTxt(v))} · Ofrecido: <b>${v.precio_ofrecido!=null?'$'+Number(v.precio_ofrecido).toLocaleString('es-MX'):'—'}</b> · Contacto: <b>${esc(p&&p.contacto||'—')}</b> · A cobrar: <b>${p&&p.precio!=null?'$'+Number(p.precio).toLocaleString('es-MX')+' '+esc(p.moneda):'—'}</b></div>
     <div class="row" style="margin-top:8px"><select data-chg="viajeEstado" data-id="${v.id}" style="width:auto">${['disponible','asignado','cancelado'].map(e=>`<option ${v.estado===e?'selected':''}>${e}</option>`).join('')}</select>
-    <button class="btn sec sm" data-act="imgSin" data-v="${v.id}">Imagen del viaje</button>
+    <button class="btn sec sm" data-act="imgSin" data-v="${v.id}">Imagen del viaje con precio</button>
     <button class="btn sec sm" data-act="delViaje" data-id="${v.id}">Borrar</button></div>
     ${ints||'<div class="inter mut">Sin interesados todavía.</div>'}</div>`;
   };
@@ -499,7 +499,7 @@ const acts={
     if(!confirm('¿Quitar a este chofer de este viaje?'))return;
     const d=await sb.from('interesados').delete().eq('id',b.dataset.id);if(d.error)throw d.error;
     toast('Quitado');await refresh()},
-  imgSin:async b=>{const v=await viajeAdmin(b.dataset.v);await imagenViaje(v,null,true)},
+  imgSin:async b=>{const v=await viajeAdmin(b.dataset.v);await imagenViaje(v,null,false)},
   nuevoChofer:async()=>{S.nuevoChofer=!S.nuevoChofer;await render()},
   guardaNotas:async b=>{
     const t=document.querySelector(`[data-notas="${b.dataset.id}"]`).value;
