@@ -524,8 +524,9 @@ const acts={
     if(error)throw error;await refresh();
   },
   wa:async b=>{const v=await viajeAdmin(b.dataset.v);let tel=(b.dataset.tel||'').replace(/\D/g,'');if(tel.length===10)tel='52'+tel;
-    const p=one(v.viajes_privado);const txt=lineas(v).filter(x=>b.dataset.ok==='1'||x[0]!=='Precio ofrecido').map(x=>x[0]+': '+x[1]).join('\n');
-    window.open('https://wa.me/'+tel+'?text='+encodeURIComponent('Hola, te comparto el viaje:\n'+txt),'_blank')},
+    /* se manda la imagen del viaje; con precio solo si el chofer está verificado y aprobado */
+    toast(b.dataset.ok==='1'?'Elige WhatsApp y el chat del chofer':'Imagen sin precio: el chofer aún no está autorizado');
+    await imagenViaje(v,null,b.dataset.ok!=='1',tel)},
   img:async b=>{if(b.dataset.ok!=='1'){toast('Primero verifica al chofer y aprueba su solicitud',true);return}const v=await viajeAdmin(b.dataset.v);await imagenViaje(v,one(v.viajes_privado))}
 };
 async function viajeAdmin(id){const d=await datosAdmin();return d.find(v=>v.id===id)}
@@ -598,7 +599,7 @@ const forms={
 };
 
 /* ---------- imagen para WhatsApp ---------- */
-async function imagenViaje(v,p,sinPrecio){
+async function imagenViaje(v,p,sinPrecio,tel){
   const c=document.createElement('canvas');c.width=1080;c.height=1350;const x=c.getContext('2d');
   x.fillStyle='#fff';x.fillRect(0,0,1080,1350);x.fillStyle='#0b5ed7';x.fillRect(0,0,1080,150);
   x.fillStyle='#fff';x.font='bold 56px sans-serif';x.fillText("Transporte D'Leon",50,96);
@@ -615,10 +616,12 @@ async function imagenViaje(v,p,sinPrecio){
     x.fillText('$'+Number(v.precio_ofrecido).toLocaleString('es-MX')+' MXN',50,1295)}
   const blob=await new Promise(r=>c.toBlob(r,'image/png'));
   const file=new File([blob],'viaje.png',{type:'image/png'});
+  const baja=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='viaje.png';a.click();
+    if(tel){toast('Imagen guardada. Adjúntala en el chat de WhatsApp.');window.open('https://wa.me/'+tel,'_blank')}};
   try{
     if(navigator.canShare&&navigator.canShare({files:[file]}))await navigator.share({files:[file]});
-    else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='viaje.png';a.click()}
-  }catch(e){if(e.name!=='AbortError')throw e}
+    else baja();
+  }catch(e){if(e.name==='AbortError')return;if(tel)baja();else throw e}
 }
 
 /* ---------- eventos ---------- */
