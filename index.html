@@ -96,7 +96,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 16:30</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 20:20</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -256,6 +256,7 @@ async function render(){
     else if(S.view==='perfil')app.innerHTML=vistaPerfil();
     else if(S.view==='admin'){app.innerHTML='<p class="empty">Cargando…</p>';app.innerHTML=await vistaAdmin()}
   }catch(e){app.innerHTML=`<p class="empty bad">Error: ${esc(e.message)}</p>`}
+  if(S.focusChofer){const el=document.getElementById('ch-'+S.focusChofer);S.focusChofer=null;if(el)el.scrollIntoView({block:'start'})}
   if(S.focusRow){const tr=document.querySelector(`tr[data-row="${S.focusRow}"]`);S.focusRow=null;if(tr){tr.classList.add('foco');tr.scrollIntoView({block:'center'})}}
 }
 
@@ -277,7 +278,8 @@ function cardViaje(v){
 
 function perfilForm(c,alta){
   c=c||{};
-  return `<form data-form="${alta?'alta':'perfil'}">
+  const modo=alta===true?'alta':alta==='edit'?'edit':'perfil';
+  return `<form data-form="${modo==='alta'?'alta':modo==='edit'?'editaChofer':'perfil'}" ${modo==='edit'?`data-id="${c.id}"`:''}>
   <label>Nombre completo</label><input name="nombre" required value="${esc(c.nombre)}">
   <div class="g2"><div><label>Teléfono / WhatsApp</label><input name="telefono" type="tel" required value="${esc(c.telefono)}"></div>
   <div><label>Ciudad donde estás</label><input name="ciudad" value="${esc(c.ciudad)}"></div></div>
@@ -295,9 +297,9 @@ function perfilForm(c,alta){
   <div class="g2"><div><label>Banco</label><input name="banco" value="${esc(c.banco)}"></div>
   <div><label>Titular de la cuenta</label><input name="titular" value="${esc(c.titular)}"></div></div>
   <label>CLABE (18 dígitos) o tarjeta (16 dígitos)</label><input name="clabe" inputmode="numeric" maxlength="18" placeholder="Solo números" value="${esc(c.clabe)}">
-  ${alta?`<label class="row" style="color:var(--tx)"><input type="checkbox" name="verif" style="width:auto"> Ya lo verifiqué personalmente</label>`:''}
-  <p class="mut">Tu licencia, tarjeta de circulación y seguro te los pedirá el administrador por WhatsApp.</p>
-  <button class="btn full" type="submit">${alta?'Dar de alta chofer':'Guardar mi perfil'}</button></form>`;
+  ${modo==='alta'?`<label class="row" style="color:var(--tx)"><input type="checkbox" name="verif" style="width:auto"> Ya lo verifiqué personalmente</label>`:''}
+  ${modo==='perfil'?'<p class="mut">Sube tus documentos en la sección Mis documentos, aquí abajo.</p>':''}
+  <button class="btn full" type="submit">${modo==='alta'?'Dar de alta chofer':modo==='edit'?'Guardar cambios':'Guardar mi perfil'}</button></form>`;
 }
 function vistaPerfil(){
   return `<div class="card"><h3>Mi perfil de chofer</h3><p class="mut">${S.chofer?'Tus datos solo los ves tú y el administrador.':'Completa tus datos una sola vez. Con ellos podrás registrarte en los viajes.'}</p>${perfilForm(S.chofer,false)}</div>${S.chofer?`<div class="card"><h3>Mis documentos</h3><p class="mut">Sube una foto o PDF de cada documento. Solo los ven tú y el administrador.</p>${docsHtml(S.chofer,S.misDocs||{})}</div>`:''}`;
@@ -406,14 +408,16 @@ async function vistaChoferes(){
   if(!list.length)return o+'<p class="empty">Sin choferes.</p>';
   return o+list.map(c=>{
     const a=one(c.choferes_admin)||{};
-    return `<div class="card"><div class="row sp"><h3>${esc(c.nombre)}</h3><span class="badge ${a.verificacion==='verificado'?'ok':a.verificacion==='rechazado'?'bad':'warn'}">${esc(a.verificacion||'pendiente')}</span></div>
+    return `<div class="card" id="ch-${c.id}"><div class="row sp"><h3>${esc(c.nombre)}</h3><span class="badge ${a.verificacion==='verificado'?'ok':a.verificacion==='rechazado'?'bad':'warn'}">${esc(a.verificacion||'pendiente')}</span></div>
     <div class="mut">${esc(c.telefono)} · ${esc([c.ciudad,c.estado].filter(Boolean).join(', '))}</div>
     <div class="tags"><span class="tag">Lic. ${esc(c.licencia_federal)} (vence ${esc(c.licencia_vence||'—')})</span><span class="tag">${esc((c.unidades||[]).join(', ')||'Sin unidad')}${c.medida_pies?' '+c.medida_pies+'\'':''}</span><span class="tag">Placas ${esc(c.placas||'—')}</span><span class="tag">Seguro vence ${esc(c.seguro_vence||'—')}</span><span class="tag">Exp. médico ${esc(c.expediente_medico||'—')} (vence ${esc(c.medico_vence||'—')})</span></div>
     <div class="mut">${esc(c.banco||'')} ${esc(c.titular||'')} ${c.clabe?(c.clabe.length===16?'Tarjeta ':'CLABE ')+esc(c.clabe):''}</div>
+    <div class="row" style="margin-top:8px"><button type="button" class="btn sm" data-act="editChofer" data-id="${c.id}">${S.editChofer===c.id?'Cerrar edición':'Editar datos'}</button></div>
+    ${S.editChofer===c.id?`<div style="margin-top:10px">${perfilForm(c,'edit')}</div>`:''}
     <div class="row" style="margin-top:8px"><select data-chg="verif" data-id="${c.id}" style="width:auto">${['pendiente','verificado','rechazado'].map(e=>`<option ${a.verificacion===e?'selected':''}>${e}</option>`).join('')}</select>
     <span class="mut">${a.verificado_en?'Verificado el '+esc(a.verificado_en):''}</span></div>
     ${(()=>{const f=faltaChofer(c);return f.length?`<div style="margin-top:8px"><span class="badge warn">Faltan ${f.length}</span><div class="tags" style="margin-top:6px">${f.map(x=>`<span class="tag" style="background:#fff4d6;color:#5c4300">${esc(x)}</span>`).join('')}</div></div>`:'<div style="margin-top:8px"><span class="badge ok">Datos completos</span></div>'})()}
-    <details style="margin-top:10px"><summary><b>Documentos</b> (${docsReq(c).filter(t=>docsMap(c.chofer_documentos)[t]).length}/${docsReq(c).length} requeridos)</summary>${docsHtml(c,docsMap(c.chofer_documentos))}</details>
+    <details style="margin-top:10px" ${S.editChofer===c.id?'open':''}><summary><b>Documentos</b> (${docsReq(c).filter(t=>docsMap(c.chofer_documentos)[t]).length}/${docsReq(c).length} requeridos)</summary>${docsHtml(c,docsMap(c.chofer_documentos))}</details>
     <div class="mut" style="margin-top:8px"><b>Viajes que eligió:</b></div>
     ${(c.interesados||[]).length?(c.interesados||[]).map(i=>{const w=i.viaje||{};return `<div class="mut">• ${esc((w.origen_ciudad||'?')+' → '+(w.destino_ciudad||'—'))} · ${esc(fmtFecha(w.fecha_carga))} · <b>${esc(EST_INT[i.estado]||i.estado)}</b></div>`}).join(''):'<div class="mut">Ninguno todavía.</div>'}
     <label>Notas tuyas (el chofer no las ve)</label><textarea data-notas="${c.id}">${esc(a.notas||'')}</textarea>
@@ -579,7 +583,8 @@ const acts={
   resFiltro:async b=>{S.resFiltro=S.resFiltro===b.dataset.v?null:b.dataset.v;await render()},
   irTabla:async b=>{S.sub='tabla';S.fTabla='todos';S.soloFaltan=false;S.focusRow=b.dataset.id;await render()},
   irViajes:async()=>{S.sub='viajes';await render()},
-  irChofer:async b=>{S.sub='choferes';S.q=b.dataset.n||'';await render()},
+  irChofer:async b=>{S.sub='choferes';S.q=b.dataset.n||'';S.nuevoChofer=false;S.editChofer=b.dataset.id;S.focusChofer=b.dataset.id;await render()},
+  editChofer:async b=>{S.editChofer=S.editChofer===b.dataset.id?null:b.dataset.id;await render()},
   sub:async b=>{S.sub=b.dataset.v;await render()},
   interes:b=>registrarInteres(b.dataset.id),
   verDoc:async b=>{const u=await sb.storage.from('documentos').createSignedUrl(b.dataset.ruta,300);if(u.error)throw u.error;window.open(u.data.signedUrl,'_blank')},
@@ -656,6 +661,12 @@ const forms={
     if(r.error){if(r.error.code==='23505')throw new Error('Esa licencia ya está registrada. Si eres tú, avisa al administrador.');throw r.error}
     S.chofer=r.data;toast('Perfil guardado');
     if(S.pending){const id=S.pending;S.view='viajes';await registrarInteres(id)}else await render();
+  },
+  editaChofer:async f=>{
+    const d=datosChofer(f);
+    const r=await sb.from('choferes').update(d).eq('id',f.dataset.id).select().single();
+    if(r.error){if(r.error.code==='23505')throw new Error('Esa licencia ya está registrada en otro chofer');throw r.error}
+    S.editChofer=null;toast('Datos del chofer guardados');await render();
   },
   alta:async f=>{
     const d=datosChofer(f);
