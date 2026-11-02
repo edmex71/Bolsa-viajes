@@ -96,7 +96,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 21:20</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 21:35</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -293,8 +293,8 @@ function perfilForm(c,alta){
   <label>Unidad que tienes (elige 1)</label>${radios('unidades',S.tipos,c.unidades)}
   <div class="g2"><div><label>Medida</label><select name="medida_pies">${optsMedida(c.unidades,c.medida_pies)}</select></div>
   <div><label>Placas de la unidad</label><input name="placas" value="${esc(c.placas)}"></div></div>
-  <div id="placasEqBox" ${(c.unidades||[]).includes('Tracto')?'':'hidden'}><label>Placas del equipo</label><input name="placas_equipo" value="${esc(c.placas_equipo)}"></div>
   <label>Equipo (elige 1)</label>${radios('cajas',CAJAS,c.cajas)}
+  <div id="placasEqBox" ${(c.unidades||[]).includes('Tracto')?'':'hidden'}><label>Placas del equipo</label><input name="placas_equipo" value="${esc(c.placas_equipo)}"></div>
   <label>Vence el seguro de la unidad</label><input name="seguro_vence" type="date" value="${esc(c.seguro_vence)}">
   <div class="g2"><div><label>Núm. de expediente médico</label><input name="expediente_medico" inputmode="numeric" value="${esc(c.expediente_medico)}" placeholder="Constancia médica"></div>
   <div><label>Vence el médico</label><input name="medico_vence" type="date" value="${esc(c.medico_vence)}"></div></div>
