@@ -96,7 +96,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 20:35</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 20:50</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -121,6 +121,7 @@ function pintaMedidas(form){
   const s=form.querySelector('select[name="medida_pies"]');if(!s)return;
   const un=vals(form,'unidades');
   s.innerHTML=optsMedida(un,medidasPara(un).includes(s.value)?s.value:'');
+  const pe=form.querySelector('#placasEqBox');if(pe)pe.hidden=!un.includes('Tracto');
 }
 const PAGOS={'50-50':'50% y 50%','al_descargar':'Al descargar','credito':'A crédito'};
 const EST_INT={interesado:'Interesado',asignado:'Asignado',cubierto:'Cubierto'};
@@ -182,6 +183,7 @@ function faltaChofer(c){
   else if(c.licencia_vence<hoy0)f.push('Licencia vencida');
   if(!(c.unidades||[]).length)f.push('Unidad');
   if(vacioT(c.placas))f.push('Placas');
+  if((c.unidades||[]).includes('Tracto')&&vacioT(c.placas_equipo))f.push('Placas del equipo');
   if(!c.seguro_vence)f.push('Seguro (vencimiento)');
   else if(c.seguro_vence<hoy0)f.push('Seguro vencido');
   if(vacioT(c.expediente_medico))f.push('Expediente médico');
@@ -290,7 +292,8 @@ function perfilForm(c,alta){
   <div><label>Vence la licencia</label><input name="licencia_vence" type="date" value="${esc(c.licencia_vence)}"></div></div>
   <label>Unidad que tienes (elige 1)</label>${radios('unidades',S.tipos,c.unidades)}
   <div class="g2"><div><label>Medida</label><select name="medida_pies">${optsMedida(c.unidades,c.medida_pies)}</select></div>
-  <div><label>Placas</label><input name="placas" value="${esc(c.placas)}"></div></div>
+  <div><label>Placas de la unidad</label><input name="placas" value="${esc(c.placas)}"></div></div>
+  <div id="placasEqBox" ${(c.unidades||[]).includes('Tracto')?'':'hidden'}><label>Placas del equipo (caja o plataforma)</label><input name="placas_equipo" value="${esc(c.placas_equipo)}"></div>
   <label>Equipo (elige 1)</label>${radios('cajas',CAJAS,c.cajas)}
   <label>Vence el seguro de la unidad</label><input name="seguro_vence" type="date" value="${esc(c.seguro_vence)}">
   <div class="g2"><div><label>Núm. de expediente médico</label><input name="expediente_medico" inputmode="numeric" value="${esc(c.expediente_medico)}" placeholder="Constancia médica"></div>
@@ -412,7 +415,7 @@ async function vistaChoferes(){
     const a=one(c.choferes_admin)||{};
     return `<div class="card" id="ch-${c.id}"><div class="row sp"><h3>${esc(c.nombre)}</h3><span class="badge ${a.verificacion==='verificado'?'ok':a.verificacion==='rechazado'?'bad':'warn'}">${esc(a.verificacion||'pendiente')}</span></div>
     <div class="mut">${esc(c.telefono)} · ${esc([c.ciudad,c.estado].filter(Boolean).join(', '))}</div>
-    <div class="tags"><span class="tag">Lic. ${esc(c.licencia_federal)} (vence ${esc(c.licencia_vence||'—')})</span><span class="tag">${esc((c.unidades||[]).join(', ')||'Sin unidad')}${c.medida_pies?' '+c.medida_pies+'\'':''}</span><span class="tag">Placas ${esc(c.placas||'—')}</span><span class="tag">Seguro vence ${esc(c.seguro_vence||'—')}</span><span class="tag">Exp. médico ${esc(c.expediente_medico||'—')} (vence ${esc(c.medico_vence||'—')})</span></div>
+    <div class="tags"><span class="tag">Lic. ${esc(c.licencia_federal)} (vence ${esc(c.licencia_vence||'—')})</span><span class="tag">${esc((c.unidades||[]).join(', ')||'Sin unidad')}${c.medida_pies?' '+c.medida_pies+'\'':''}</span><span class="tag">Placas ${esc(c.placas||'—')}</span>${(c.unidades||[]).includes('Tracto')?`<span class="tag">Placas equipo ${esc(c.placas_equipo||'—')}</span>`:''}<span class="tag">Seguro vence ${esc(c.seguro_vence||'—')}</span><span class="tag">Exp. médico ${esc(c.expediente_medico||'—')} (vence ${esc(c.medico_vence||'—')})</span></div>
     <div class="mut">${esc(c.banco||'')} ${esc(c.titular||'')} ${c.clabe?(c.clabe.length===16?'Tarjeta ':'CLABE ')+esc(c.clabe):''}</div>
     <div class="row" style="margin-top:8px"><button type="button" class="btn sm" data-act="editChofer" data-id="${c.id}">${S.editChofer===c.id?'Cerrar edición':'Editar datos'}</button></div>
     ${S.editChofer===c.id?`<div style="margin-top:10px">${perfilForm(c,'edit')}</div>`:''}
@@ -642,7 +645,7 @@ function datosChofer(f){
   if(clabe&&!/^(\d{16}|\d{18})$/.test(clabe))throw new Error('Escribe la CLABE de 18 dígitos o la tarjeta de 16 dígitos, solo números');
   return {nombre:nn(g('nombre')),telefono:nn(g('telefono')),ciudad:nn(g('ciudad')),estado:nn(g('estado')),
     licencia_federal:nn(g('licencia_federal'))?.toUpperCase().replace(/\s+/g,''),licencia_vence:nn(g('licencia_vence')),
-    unidades:vals(f,'unidades'),medida_pies:nn(g('medida_pies')),cajas:vals(f,'cajas'),placas:nn(g('placas'))?.toUpperCase(),
+    unidades:vals(f,'unidades'),medida_pies:nn(g('medida_pies')),cajas:vals(f,'cajas'),placas:nn(g('placas'))?.toUpperCase(),placas_equipo:vals(f,'unidades').includes('Tracto')?nn(g('placas_equipo'))?.toUpperCase():null,
     seguro_vence:nn(g('seguro_vence')),expediente_medico:nn(g('expediente_medico')),medico_vence:nn(g('medico_vence')),banco:nn(g('banco')),titular:nn(g('titular')),clabe};
 }
 const forms={
