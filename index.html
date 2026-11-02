@@ -96,14 +96,14 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 20:50</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 21:05</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 const ESTADOS=['Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua','Ciudad de México','Coahuila','Colima','Durango','Estado de México','Guanajuato','Guerrero','Hidalgo','Jalisco','Michoacán','Morelos','Nayarit','Nuevo León','Oaxaca','Puebla','Querétaro','Quintana Roo','San Luis Potosí','Sinaloa','Sonora','Tabasco','Tamaulipas','Tlaxcala','Veracruz','Yucatán','Zacatecas'];
-const CAJAS=[['seca','Caja seca'],['cerrada','Cerrada'],['termo','Refrigerada (termo)'],['plataforma','Plataforma'],['lowboy','Lowboy']];
+const CAJAS=[['seca','Caja seca'],['termo','Refrigerada (termo)'],['plataforma','Plataforma'],['lowboy','Lowboy']];
 const CAJA_N=Object.fromEntries(CAJAS);
 /* medida (pies): el Tracto puede ser 53, 48, 45 o 40; las demás unidades (torton, camionetas, rabón…) no pueden ser 48 ni 53 */
 const MEDIDAS_TRACTO=['53','48','48 o 53','45','40'];
