@@ -96,7 +96,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 20:20</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 20:35</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -133,17 +133,19 @@ const num=v=>{v=nn(v);return v===null?null:Number(v)};
 /* asignar solo desde la solicitud del chofer: el viaje no ofrece 'asignado' a mano */
 const nombresInt=v=>(v.interesados||[]).filter(i=>i.estado!=='cubierto').map(i=>(i.chofer&&i.chofer.nombre)||'—');
 /* ---------- documentos del chofer ---------- */
-const DOCS={licencia:'Licencia federal',ine:'INE',tc_unidad:'Tarjeta de circulación de la unidad (tracto, torton o camioneta)',tc_caja:'Tarjeta de circulación de la caja o plana',seguro:'Seguro de la unidad',medico:'Constancia médica'};
-const DOCS_CORTO={licencia:'Licencia (archivo)',ine:'INE',tc_unidad:'Tarjeta de circulación de la unidad',tc_caja:'Tarjeta de circulación de la caja/plana',seguro:'Seguro',medico:'Constancia médica'};
+const DOCS={licencia:'Licencia federal',ine:'INE',tc_unidad:'Tarjeta de circulación de la unidad (tracto, torton o camioneta)',tc_caja:'Tarjeta de circulación del equipo (caja o plataforma)',seguro:'Seguro de la unidad',medico:'Constancia médica'};
+const DOCS_CORTO={licencia:'Licencia (archivo)',ine:'INE',tc_unidad:'Tarjeta de circulación de la unidad',tc_caja:'Tarjeta de circulación del equipo (caja/plataforma)',seguro:'Seguro',medico:'Constancia médica'};
 const DOCS_OPC=['medico'];
+/* la tarjeta del equipo solo aplica a Tracto; si aún no se elige unidad se muestra como opcional */
+const docsOpc=c=>(c&&c.unidades||[]).length?DOCS_OPC:['tc_caja'].concat(DOCS_OPC);
 const docsReq=c=>['licencia','ine','tc_unidad','seguro'].concat((c&&c.unidades||[]).includes('Tracto')?['tc_caja']:[]);
 const docsMap=l=>Object.fromEntries((l||[]).map(d=>[d.tipo,d]));
 function docsHtml(c,map){
-  const fila=(t,req)=>{const d=map[t];return `<div style="padding:10px 0;border-top:1px solid #e4e7ec"><div class="row sp"><b>${esc(DOCS[t])}</b><span class="badge ${d?'ok':(req?'warn':'')}">${d?'Subido':(req?'Falta':'Opcional')}</span></div>
+  const fila=(t,req)=>{const d=map[t];return `<div style="padding:10px 0;border-top:1px solid #e4e7ec"><div class="row sp"><b>${esc(DOCS[t])}</b><span class="badge ${d?'ok':(req?'warn':'')}">${d?'Subido':(req?'Falta':(t==='tc_caja'?'Solo si es tracto':'Opcional'))}</span></div>
   <div class="row" style="margin-top:8px;flex-wrap:wrap;gap:8px">${d?`<button type="button" class="btn sec sm" data-act="verDoc" data-ruta="${esc(d.ruta)}">Ver</button>`:''}
   <label class="btn sec sm" style="cursor:pointer">📷 Tomar foto<input type="file" hidden accept="image/*" capture="environment" data-doc="${t}" data-chofer="${c.id}"></label>
   <label class="btn sec sm" style="cursor:pointer">📄 Subir foto o PDF<input type="file" hidden accept="image/*,application/pdf" data-doc="${t}" data-chofer="${c.id}"></label></div></div>`};
-  return docsReq(c).map(t=>fila(t,true)).join('')+DOCS_OPC.map(t=>fila(t,false)).join('');
+  return docsReq(c).map(t=>fila(t,true)).join('')+docsOpc(c).map(t=>fila(t,false)).join('');
 }
 async function reduceImagen(file){
   if(!file.type.startsWith('image/'))return file;
