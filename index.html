@@ -96,7 +96,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 22:05</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 22:20</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -137,8 +137,8 @@ const nombresInt=v=>(v.interesados||[]).filter(i=>i.estado!=='cubierto').map(i=>
 const DOCS={licencia:'Licencia federal',ine:'INE',tc_unidad:'Tarjeta de circulación de la unidad (tracto, torton o camioneta)',tc_caja:'Tarjeta de circulación del equipo (caja o plataforma)',seguro:'Seguro de la unidad',medico:'Constancia médica'};
 const DOCS_CORTO={licencia:'Licencia (archivo)',ine:'INE',tc_unidad:'Tarjeta de circulación de la unidad',tc_caja:'Tarjeta de circulación del equipo (caja/plataforma)',seguro:'Seguro',medico:'Constancia médica'};
 const DOCS_OPC=['medico'];
-/* la tarjeta del equipo solo aplica a Tracto; si aún no se elige unidad se muestra como opcional */
-const docsOpc=c=>(c&&c.unidades||[]).length?DOCS_OPC:['tc_caja'].concat(DOCS_OPC);
+/* la tarjeta del equipo solo aplica y se muestra cuando la unidad es Tracto */
+const docsOpc=c=>DOCS_OPC;
 const docsReq=c=>['licencia','ine','tc_unidad','seguro'].concat((c&&c.unidades||[]).includes('Tracto')?['tc_caja']:[]);
 const docsMap=l=>Object.fromEntries((l||[]).map(d=>[d.tipo,d]));
 function docsHtml(c,map){
