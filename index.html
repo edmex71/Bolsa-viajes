@@ -65,10 +65,12 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
 .cellbtn{border:0;background:transparent;color:var(--pri);padding:11px 8px;font:inherit;white-space:nowrap;text-align:left;cursor:pointer;width:100%}
 main.wide{max-width:none}
 </style>
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 </head>
 <body>
 <header>
-  <h1>Bolsa de viajes<small>Transporte D'Leon</small></h1>
+  <div class="row" style="gap:10px;flex-wrap:nowrap"><img src="logo.png" alt="TDL" style="width:42px;height:42px;border-radius:50%;flex:none"><h1>Bolsa de viajes<small>Transporte D'Leon</small></h1></div>
   <div class="row" style="gap:8px;flex-wrap:nowrap"><!-- TEMPORAL: quitar al terminar las pruebas --><button class="btn sec sm" data-act="actualizar" title="Cargar la última versión">⟳ Actualizar</button><div id="hdr"></div></div>
 </header>
 <nav id="nav"></nav>
@@ -96,7 +98,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 22:40</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 22:55</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -711,7 +713,9 @@ const NOTA_REGISTRO='Para poder asignarte el viaje debes completar tu registro, 
 async function imagenViaje(v,p,sinPrecio,tel,nota){
   const H=nota?1620:1350;const c=document.createElement('canvas');c.width=1080;c.height=H;const x=c.getContext('2d');
   x.fillStyle='#fff';x.fillRect(0,0,1080,H);x.fillStyle='#0b5ed7';x.fillRect(0,0,1080,150);
-  x.fillStyle='#fff';x.font='bold 56px sans-serif';x.fillText("Transporte D'Leon",50,96);
+  const lg=await new Promise(r=>{const i=new Image();i.onload=()=>r(i);i.onerror=()=>r(null);i.src='logo.png'});
+  let tx=50;if(lg){x.save();x.beginPath();x.arc(95,75,62,0,Math.PI*2);x.closePath();x.clip();x.fillStyle='#fff';x.fillRect(30,10,130,130);x.drawImage(lg,33,13,124,124);x.restore();tx=185}
+  x.fillStyle='#fff';x.font='bold 56px sans-serif';x.fillText("Transporte D'Leon",tx,96);
   let y=230;
   const wrap=(t,w)=>{const out=[];let ln='';for(const wd of String(t).split(' ')){const test=ln?ln+' '+wd:wd;if(x.measureText(test).width>w&&ln){out.push(ln);ln=wd}else ln=test}if(ln)out.push(ln);return out};
   for(const [k,val] of lineas(v)){
