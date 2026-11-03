@@ -98,7 +98,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 2 nov 2026 · 18:50</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 2 nov 2026 · 19:00</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -342,13 +342,15 @@ async function resumen(data){
   const pend=ch.filter(x=>one(x.choferes_admin)?.verificacion==='pendiente');
   const venc=ch.filter(x=>(x.licencia_vence&&x.licencia_vence<=l30)||(x.seguro_vence&&x.seguro_vence<=l30)||(x.medico_vence&&x.medico_vence<=l30));
   const nInt=v=>(v.interesados||[]).filter(i=>i.estado!=='cubierto').length;
+  const conI=vig.filter(v=>nInt(v)>0);
   const f=S.resFiltro;
   const bt=(k,n,t)=>`<button type="button" class="stat ${f===k?'on':''}" data-act="resFiltro" data-v="${k}"><b>${n}</b>${t}</button>`;
-  let o=`<div class="stats">${bt('vigentes',vig.length,'Vigentes')}${bt('tomados',tom.length,'Tomados')}${bt('verificar',pend.length,'Choferes por verificar')}${bt('vencer',venc.length,'Documentos por vencer')}</div>`;
+  let o=`<div class="stats">${bt('vigentes',vig.length,'Vigentes')}${bt('conint',conI.length,'Con choferes interesados')}${bt('tomados',tom.length,'Tomados')}${bt('verificar',pend.length,'Choferes por verificar')}${bt('vencer',venc.length,'Documentos por vencer')}</div>`;
   const vence=(x,lbl,d)=>d&&d<=l30?`<span class="tag" style="background:#fff4d6;color:#5c4300">${lbl} ${d<h?'vencido':'vence'} ${esc(d)}</span>`:'';
   const accV=v=>`<div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap"><button type="button" class="btn sm" data-act="irTabla" data-id="${v.id}">Corregir en la Tabla</button><button type="button" class="btn sec sm" data-act="irViajes" data-id="${v.id}">Ver solicitudes</button></div>`;
   const accC=x=>`<div class="row" style="margin-top:8px"><button type="button" class="btn sm" data-act="irChofer" data-id="${x.id}" data-n="${esc(x.nombre)}">Abrir chofer</button></div>`;
   if(f==='vigentes')o+='<h2>Viajes vigentes</h2>'+(vig.length?vig.map(v=>`<div class="card"><b>${esc(dir(v))}</b><div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${nInt(v)} interesado(s)${nInt(v)?': '+esc(nombresInt(v).join(', ')):''}</div>${accV(v)}</div>`).join(''):'<p class="empty">Ninguno.</p>');
+  else if(f==='conint')o+='<h2>Viajes con choferes interesados</h2>'+(conI.length?conI.map(v=>`<div class="card"><b>${esc(dir(v))}</b><div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${nInt(v)} interesado(s)</div>${(v.interesados||[]).filter(i=>i.estado!=='cubierto').map(i=>{const ver=one(i.chofer?.choferes_admin)?.verificacion;return `<div class="row sp" style="margin-top:6px"><b>${esc(i.chofer?.nombre)}</b><span class="badge ${ver==='verificado'?'ok':'warn'}">${esc(ver||'pendiente')}</span></div>`}).join('')}${accV(v)}</div>`).join(''):'<p class="empty">Ningún viaje tiene choferes interesados.</p>')
   else if(f==='tomados')o+='<h2>Viajes tomados</h2>'+(tom.length?tom.map(v=>{const a=(v.interesados||[]).find(i=>i.estado==='asignado');return `<div class="card"><b>${esc(dir(v))}</b><div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${a?esc(a.chofer?.nombre):'sin chofer registrado'}</div>${accV(v)}</div>`}).join(''):'<p class="empty">Ninguno.</p>');
   else if(f==='verificar')o+='<h2>Choferes por verificar</h2>'+(pend.length?pend.map(x=>{const fl=faltaChofer(x);return `<div class="card"><b>${esc(x.nombre)}</b><div class="mut">${esc(x.telefono||'')}</div>${fl.length?`<div class="tags" style="margin-top:6px">${fl.map(t=>`<span class="tag" style="background:#fff4d6;color:#5c4300">${esc(t)}</span>`).join('')}</div>`:'<div class="mut">Datos completos: falta verificarlo.</div>'}${accC(x)}</div>`}).join(''):'<p class="empty">Ninguno.</p>');
   else if(f==='vencer')o+='<h2>Documentos por vencer (30 días)</h2>'+(venc.length?venc.map(x=>`<div class="card"><b>${esc(x.nombre)}</b><div class="tags" style="margin-top:6px">${vence(x,'Licencia',x.licencia_vence)}${vence(x,'Seguro',x.seguro_vence)}${vence(x,'Médico',x.medico_vence)}</div>${accC(x)}</div>`).join(''):'<p class="empty">Ninguno.</p>');
