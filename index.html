@@ -98,7 +98,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 1 nov 2026 · 22:55</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 2 nov 2026 · 18:50</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -265,7 +265,7 @@ async function render(){
   try{
     if(S.view==='viajes')app.innerHTML=vistaViajes();
     else if(S.view==='perfil')app.innerHTML=vistaPerfil();
-    else if(S.view==='admin'){app.innerHTML='<p class="empty">Cargando…</p>';app.innerHTML=await vistaAdmin()}
+    else if(S.view==='admin'){app.innerHTML='<p class="empty">Cargando…</p>';app.innerHTML=(S.back?`<div class="row" style="margin-bottom:10px"><button type="button" class="btn sec sm" data-act="volver">← Volver a ${esc(S.back.txt)}</button></div>`:'')+await vistaAdmin()}
   }catch(e){app.innerHTML=`<p class="empty bad">Error: ${esc(e.message)}</p>`}
   if(S.focusChofer){const el=document.getElementById('ch-'+S.focusChofer);S.focusChofer=null;if(el)el.scrollIntoView({block:'start'})}
   if(S.focusRow){const tr=document.querySelector(`tr[data-row="${S.focusRow}"]`);S.focusRow=null;if(tr){tr.classList.add('foco');tr.scrollIntoView({block:'center'})}}
@@ -330,7 +330,7 @@ async function vistaAdmin(){
   if(S.sub==='publicar')return formViaje();
   if(S.sub==='choferes')return await vistaChoferes();
   const data=await datosAdmin();
-  if(S.sub==='viajes')return listaAdmin(data);
+  if(S.sub==='viajes')return listaAdmin(S.soloViaje?data.filter(v=>v.id===S.soloViaje):data);
   return await resumen(data);
 }
 async function resumen(data){
@@ -346,7 +346,7 @@ async function resumen(data){
   const bt=(k,n,t)=>`<button type="button" class="stat ${f===k?'on':''}" data-act="resFiltro" data-v="${k}"><b>${n}</b>${t}</button>`;
   let o=`<div class="stats">${bt('vigentes',vig.length,'Vigentes')}${bt('tomados',tom.length,'Tomados')}${bt('verificar',pend.length,'Choferes por verificar')}${bt('vencer',venc.length,'Documentos por vencer')}</div>`;
   const vence=(x,lbl,d)=>d&&d<=l30?`<span class="tag" style="background:#fff4d6;color:#5c4300">${lbl} ${d<h?'vencido':'vence'} ${esc(d)}</span>`:'';
-  const accV=v=>`<div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap"><button type="button" class="btn sm" data-act="irTabla" data-id="${v.id}">Corregir en la Tabla</button><button type="button" class="btn sec sm" data-act="irViajes">Ver solicitudes</button></div>`;
+  const accV=v=>`<div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap"><button type="button" class="btn sm" data-act="irTabla" data-id="${v.id}">Corregir en la Tabla</button><button type="button" class="btn sec sm" data-act="irViajes" data-id="${v.id}">Ver solicitudes</button></div>`;
   const accC=x=>`<div class="row" style="margin-top:8px"><button type="button" class="btn sm" data-act="irChofer" data-id="${x.id}" data-n="${esc(x.nombre)}">Abrir chofer</button></div>`;
   if(f==='vigentes')o+='<h2>Viajes vigentes</h2>'+(vig.length?vig.map(v=>`<div class="card"><b>${esc(dir(v))}</b><div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${nInt(v)} interesado(s)${nInt(v)?': '+esc(nombresInt(v).join(', ')):''}</div>${accV(v)}</div>`).join(''):'<p class="empty">Ninguno.</p>');
   else if(f==='tomados')o+='<h2>Viajes tomados</h2>'+(tom.length?tom.map(v=>{const a=(v.interesados||[]).find(i=>i.estado==='asignado');return `<div class="card"><b>${esc(dir(v))}</b><div class="mut">${esc(fmtFecha(v.fecha_carga))} · ${a?esc(a.chofer?.nombre):'sin chofer registrado'}</div>${accV(v)}</div>`}).join(''):'<p class="empty">Ninguno.</p>');
@@ -596,11 +596,12 @@ const acts={
   logout:async()=>{await sb.auth.signOut();S.view='viajes';await refresh()},
   tab:async b=>{S.view=b.dataset.v;await render()},
   resFiltro:async b=>{S.resFiltro=S.resFiltro===b.dataset.v?null:b.dataset.v;await render()},
-  irTabla:async b=>{S.sub='tabla';S.fTabla='todos';S.soloFaltan=false;S.focusRow=b.dataset.id;await render()},
-  irViajes:async()=>{S.sub='viajes';await render()},
-  irChofer:async b=>{S.sub='choferes';S.q=b.dataset.n||'';S.nuevoChofer=false;S.editChofer=b.dataset.id;S.focusChofer=b.dataset.id;await render()},
+  irTabla:async b=>{S.back={sub:S.sub,txt:S.sub==='resumen'?'Resumen':'la lista'};S.sub='tabla';S.fTabla='todos';S.soloFaltan=false;S.focusRow=b.dataset.id;await render()},
+  irViajes:async b=>{S.back={sub:S.sub,txt:S.sub==='resumen'?'Resumen':'la lista'};S.soloViaje=b.dataset.id||null;S.sub='viajes';await render()},
+  volver:async()=>{const b=S.back;S.back=null;S.soloViaje=null;S.sub=b?b.sub:'resumen';await render()},
+  irChofer:async b=>{S.back={sub:S.sub,txt:S.sub==='resumen'?'Resumen':'la lista'};S.sub='choferes';S.q=b.dataset.n||'';S.nuevoChofer=false;S.editChofer=b.dataset.id;S.focusChofer=b.dataset.id;await render()},
   editChofer:async b=>{S.editChofer=S.editChofer===b.dataset.id?null:b.dataset.id;await render()},
-  sub:async b=>{S.sub=b.dataset.v;await render()},
+  sub:async b=>{S.back=null;S.soloViaje=null;S.sub=b.dataset.v;await render()},
   interes:b=>registrarInteres(b.dataset.id),
   verDoc:async b=>{const u=await sb.storage.from('documentos').createSignedUrl(b.dataset.ruta,300);if(u.error)throw u.error;window.open(u.data.signedUrl,'_blank')},
   actualizar:async()=>{try{if(window.caches){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}}catch(e){}location.replace(location.pathname+'?v='+Date.now())},
