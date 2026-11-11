@@ -102,7 +102,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 10 nov 2026 · 23:45</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 11 nov 2026 · 00:05</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -448,13 +448,19 @@ async function vistaAdmins(){
 async function vistaChoferes(){
   const {data,error}=await sb.from('choferes').select('*, choferes_admin(*), chofer_documentos(tipo,ruta,nombre_archivo,verificado), interesados(id,estado,viaje:viajes(origen_ciudad,destino_ciudad,fecha_carga,estado))').order('created_at',{ascending:false});
   if(error)throw error;
-  const q=S.q.toLowerCase();
-  const list=(data||[]).filter(c=>!q||(c.nombre+' '+c.licencia_federal+' '+c.telefono).toLowerCase().includes(q));
+  const sel=S.verChofer&&(data||[]).find(c=>c.id===S.verChofer);
+  if(sel)return `<div class="row" style="margin-bottom:10px"><button type="button" class="btn sec sm" data-act="cierraChofer">← Volver a la lista de choferes</button></div>`+cardChofer(sel);
+  const q=S.q.toLowerCase().trim();
+  const list=(data||[]).filter(c=>!q||(c.nombre+' '+c.licencia_federal+' '+c.telefono).toLowerCase().includes(q)).sort((x,y)=>String(x.nombre).localeCompare(String(y.nombre),'es'));
   let o=`<div class="row sp"><button class="btn sm" data-act="nuevoChofer">${S.nuevoChofer?'Cerrar formulario':'+ Dar de alta chofer'}</button></div>`;
   if(S.nuevoChofer)o+=`<div class="card" style="margin-top:12px">${perfilForm(null,true)}</div>`;
-  o+=`<label>Buscar</label><input data-inp="q" value="${esc(S.q)}" placeholder="Nombre, teléfono o licencia"><div style="height:12px"></div>`;
-  if(!list.length)return o+'<p class="empty">Sin choferes.</p>';
+  o+=`<label>Buscar</label><input data-inp="q" value="${esc(S.q)}" placeholder="Escribe un nombre (ej. Luis)" autocomplete="off"><h2>Choferes (${list.length})</h2>`;
+  if(!list.length)return o+'<p class="empty">Ningún chofer con ese nombre.</p>';
   return o+list.map(c=>{
+    const a=one(c.choferes_admin)||{};const f=faltaChofer(c);
+    return `<button type="button" class="card" data-act="abreChofer" data-id="${c.id}" style="display:block;width:100%;text-align:left;cursor:pointer;font:inherit;color:inherit"><div class="row sp"><b>${esc(c.nombre)}</b><span class="badge ${a.verificacion==='verificado'?'ok':a.verificacion==='rechazado'?'bad':'warn'}">${esc(a.verificacion||'pendiente')}</span></div><div class="mut">${esc(c.telefono)} · ${esc([c.ciudad,c.estado].filter(Boolean).join(', '))}${f.length?' · <b>Faltan '+f.length+'</b>':''}</div></button>`;
+  }).join('');
+  function cardChofer(c){
     const a=one(c.choferes_admin)||{};
     return `<div class="card" id="ch-${c.id}"><div class="row sp"><h3>${esc(c.nombre)}</h3><span class="badge ${a.verificacion==='verificado'?'ok':a.verificacion==='rechazado'?'bad':'warn'}">${esc(a.verificacion||'pendiente')}</span></div>
     <div class="mut">${esc(c.telefono)} · ${esc([c.ciudad,c.estado].filter(Boolean).join(', '))}</div>
@@ -470,7 +476,7 @@ async function vistaChoferes(){
     ${(c.interesados||[]).length?(c.interesados||[]).map(i=>{const w=i.viaje||{};return `<div class="mut">• ${esc((w.origen_ciudad||'?')+' → '+(w.destino_ciudad||'—'))} · ${esc(fmtFecha(w.fecha_carga))} · <b>${esc(EST_INT[i.estado]||i.estado)}</b></div>`}).join(''):'<div class="mut">Ninguno todavía.</div>'}
     <label>Notas tuyas (el chofer no las ve)</label><textarea data-notas="${c.id}">${esc(a.notas||'')}</textarea>
     <button class="btn sec sm" data-act="guardaNotas" data-id="${c.id}" style="margin-top:6px">Guardar notas</button></div>`;
-  }).join('');
+  }
 }
 
 /* ---------- tabla de viajes (administrador) ---------- */
@@ -632,9 +638,11 @@ const acts={
   irTabla:async b=>{S.back={sub:S.sub,txt:S.sub==='resumen'?'Resumen':'la lista'};S.sub='tabla';S.fTabla='todos';S.soloFaltan=false;S.focusRow=b.dataset.id;await render()},
   irViajes:async b=>{S.back={sub:S.sub,txt:S.sub==='resumen'?'Resumen':'la lista'};S.soloViaje=b.dataset.id||null;S.sub='viajes';await render()},
   volver:async()=>{const b=S.back;S.back=null;S.soloViaje=null;S.sub=b?b.sub:'resumen';await render()},
-  irChofer:async b=>{S.back={sub:S.sub,txt:S.sub==='resumen'?'Resumen':'la lista'};S.sub='choferes';S.q=b.dataset.n||'';S.nuevoChofer=false;S.editChofer=b.dataset.id;S.focusChofer=b.dataset.id;await render()},
+  abreChofer:async b=>{S.verChofer=b.dataset.id;S.editChofer=null;S.docsOpen=null;await render();window.scrollTo(0,0)},
+  cierraChofer:async()=>{S.verChofer=null;S.editChofer=null;S.docsOpen=null;await render()},
+  irChofer:async b=>{S.verChofer=b.dataset.id;S.back={sub:S.sub,txt:S.sub==='resumen'?'Resumen':'la lista'};S.sub='choferes';S.q='';S.nuevoChofer=false;S.editChofer=b.dataset.id;S.focusChofer=b.dataset.id;await render()},
   editChofer:async b=>{S.editChofer=S.editChofer===b.dataset.id?null:b.dataset.id;await render()},
-  sub:async b=>{S.back=null;S.soloViaje=null;S.sub=b.dataset.v;await render()},
+  sub:async b=>{S.back=null;S.soloViaje=null;S.verChofer=null;S.sub=b.dataset.v;await render()},
   interes:b=>registrarInteres(b.dataset.id),
   checkDoc:async b=>{
     const v=b.dataset.v==='1';
