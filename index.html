@@ -102,7 +102,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 11 nov 2026 · 00:05</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 11 nov 2026 · 00:20</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -454,7 +454,7 @@ async function vistaChoferes(){
   const list=(data||[]).filter(c=>!q||(c.nombre+' '+c.licencia_federal+' '+c.telefono).toLowerCase().includes(q)).sort((x,y)=>String(x.nombre).localeCompare(String(y.nombre),'es'));
   let o=`<div class="row sp"><button class="btn sm" data-act="nuevoChofer">${S.nuevoChofer?'Cerrar formulario':'+ Dar de alta chofer'}</button></div>`;
   if(S.nuevoChofer)o+=`<div class="card" style="margin-top:12px">${perfilForm(null,true)}</div>`;
-  o+=`<label>Buscar</label><input data-inp="q" value="${esc(S.q)}" placeholder="Escribe un nombre (ej. Luis)" autocomplete="off"><h2>Choferes (${list.length})</h2>`;
+  o+=`<label>Buscar chofer</label><div class="row" style="gap:8px;flex-wrap:nowrap"><input id="qChofer" value="${esc(S.q)}" placeholder="Escribe un nombre (ej. Luis)" autocomplete="off" enterkeyhint="search"><button type="button" class="btn" data-act="buscaChofer">Buscar</button>${S.q?'<button type="button" class="btn sec" data-act="limpiaBusqueda">Ver todos</button>':''}</div><h2>Choferes (${list.length})</h2>`;
   if(!list.length)return o+'<p class="empty">Ningún chofer con ese nombre.</p>';
   return o+list.map(c=>{
     const a=one(c.choferes_admin)||{};const f=faltaChofer(c);
@@ -638,6 +638,8 @@ const acts={
   irTabla:async b=>{S.back={sub:S.sub,txt:S.sub==='resumen'?'Resumen':'la lista'};S.sub='tabla';S.fTabla='todos';S.soloFaltan=false;S.focusRow=b.dataset.id;await render()},
   irViajes:async b=>{S.back={sub:S.sub,txt:S.sub==='resumen'?'Resumen':'la lista'};S.soloViaje=b.dataset.id||null;S.sub='viajes';await render()},
   volver:async()=>{const b=S.back;S.back=null;S.soloViaje=null;S.sub=b?b.sub:'resumen';await render()},
+  buscaChofer:async()=>{S.q=($('#qChofer').value||'').trim();await render()},
+  limpiaBusqueda:async()=>{S.q='';await render()},
   abreChofer:async b=>{S.verChofer=b.dataset.id;S.editChofer=null;S.docsOpen=null;await render();window.scrollTo(0,0)},
   cierraChofer:async()=>{S.verChofer=null;S.editChofer=null;S.docsOpen=null;await render()},
   irChofer:async b=>{S.verChofer=b.dataset.id;S.back={sub:S.sub,txt:S.sub==='resumen'?'Resumen':'la lista'};S.sub='choferes';S.q='';S.nuevoChofer=false;S.editChofer=b.dataset.id;S.focusChofer=b.dataset.id;await render()},
@@ -838,6 +840,7 @@ document.addEventListener('submit',async e=>{
   sb.auth.onAuthStateChange((ev)=>{if(ev==='SIGNED_OUT')refresh()});
   await cargarTipos();await refresh();
 })();
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target&&e.target.id==='qChofer'){e.preventDefault();const b=document.querySelector('[data-act=buscaChofer]');if(b)b.click()}});
 </script>
 </body>
 </html>
