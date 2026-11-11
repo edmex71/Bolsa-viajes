@@ -98,7 +98,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 10 nov 2026 · 22:30</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 10 nov 2026 · 23:00</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -428,12 +428,13 @@ async function vistaAdmins(){
   const fd=d=>d?new Date(d).toLocaleDateString('es-MX',{day:'numeric',month:'short',year:'numeric'}):'nunca';
   const us=(ru.users||[]).sort((x,y)=>(adm.has(y.id)-adm.has(x.id))||String(x.email).localeCompare(String(y.email)));
   const lista=us.map(x=>{const a=adm.get(x.id);const yo=x.id===S.user.id;
-    return `<div class="card"><div class="row sp"><div><b>${esc(x.email||'')}</b><div class="mut">Último acceso: ${esc(fd(x.ultimo))}</div></div><div class="tags">${a?`<span class="badge ok">${a.es_super?'Principal':'Administrador'}</span>`:''}${x.bloqueado?'<span class="badge warn">Bloqueado</span>':''}</div></div>
+    return `<div class="card"><div class="row sp"><div><b>${esc(x.email||'')}</b><div class="mut">Último acceso: ${esc(fd(x.ultimo))}</div></div><div class="tags">${a?`<span class="badge ok">${a.es_super?'Principal':'Administrador'}</span>`:''}${x.bloqueado?'<span class="badge warn">Bloqueado</span>':''}${x.confirmado===false?'<span class="badge warn">Correo sin verificar</span>':''}</div></div>
     <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
     <button type="button" class="btn sec sm" data-act="cambiaPass" data-id="${x.id}" data-n="${esc(x.email||'')}">Cambiar contraseña</button>
     ${yo?'':`<button type="button" class="btn sec sm" data-act="bloqueaUsuario" data-id="${x.id}" data-n="${esc(x.email||'')}" data-b="${x.bloqueado?0:1}">${x.bloqueado?'Desbloquear':'Bloquear'}</button>`}
-    ${yo?'':a?`<button type="button" class="btn sec sm" data-act="quitaAdmin" data-id="${x.id}" data-n="${esc(x.email||'')}">Quitar administrador</button>`:`<button type="button" class="btn sec sm" data-act="hazAdmin" data-n="${esc(x.email||'')}">Hacer administrador</button>`}</div></div>`}).join('');
-  return `<p class="mut">Solo tú, como administrador principal, ves esta sección. Aquí das o quitas el acceso de administrador, cambias contraseñas y bloqueas usuarios.</p><h2>Usuarios (${us.length})</h2>${lista||'<p class="empty">Sin usuarios.</p>'}`;
+    ${yo?'':a?`<button type="button" class="btn sec sm" data-act="quitaAdmin" data-id="${x.id}" data-n="${esc(x.email||'')}">Quitar administrador</button>`:`<button type="button" class="btn sec sm" data-act="hazAdmin" data-n="${esc(x.email||'')}">Hacer administrador</button>`}
+    ${yo?'':`<button type="button" class="btn sec sm" data-act="borraUsuario" data-id="${x.id}" data-n="${esc(x.email||'')}" style="color:#b42318;border-color:#b42318">Borrar usuario</button>`}</div></div>`}).join('');
+  return `<p class="mut">Solo tú, como administrador principal, ves esta sección. Aquí das o quitas el acceso de administrador, cambias contraseñas, bloqueas y borras usuarios.</p><h2>Usuarios (${us.length})</h2>${lista||'<p class="empty">Sin usuarios.</p>'}`;
 }
 async function vistaChoferes(){
   const {data,error}=await sb.from('choferes').select('*, choferes_admin(*), chofer_documentos(tipo,ruta,nombre_archivo), interesados(id,estado,viaje:viajes(origen_ciudad,destino_ciudad,fecha_carga,estado))').order('created_at',{ascending:false});
@@ -571,7 +572,7 @@ async function celda(el){
 
 /* ---------- acciones ---------- */
 function abrirAuth(){S.authMode='login';pintaAuth();$('#dlg').showModal()}
-function pintaAuth(){const s=S.authMode==='signup';$('#authTitle').textContent=s?'Crear cuenta':'Entrar';$('#authBtn').textContent=s?'Crear cuenta':'Entrar';$('#authToggle').textContent=s?'Ya tengo cuenta':'Crear cuenta';$('#authHint').textContent=s?'Usa un correo que revises, a veces pedimos confirmarlo.':'Entra con tu correo para registrarte en un viaje.'}
+function pintaAuth(){const s=S.authMode==='signup';$('#authTitle').textContent=s?'Crear cuenta':'Entrar';$('#authBtn').textContent=s?'Crear cuenta':'Entrar';$('#authToggle').textContent=s?'Ya tengo cuenta':'Crear cuenta';$('#authHint').textContent=s?'Usa un correo que revises. Después de crear la cuenta tendrás que verificarlo con el enlace que te enviamos.':'Entra con tu correo para registrarte en un viaje.'}
 async function registrarInteres(id){
   if(!S.user){S.pending=id;abrirAuth();return}
   if(!S.chofer){S.pending=id;S.view='perfil';await render();toast('Primero completa tu perfil de chofer');return}
@@ -641,6 +642,10 @@ const acts={
   cambiaPass:async b=>{
     const p=prompt('Nueva contraseña para '+b.dataset.n+' (mínimo 8 caracteres):');if(!p)return;
     await llamaUsuarios({accion:'password',user_id:b.dataset.id,password:p});toast('Contraseña cambiada')},
+  borraUsuario:async b=>{
+    if(!confirm('¿BORRAR a '+b.dataset.n+'?\n\nSe elimina su cuenta, su perfil de chofer, sus solicitudes de viaje y sus documentos. No se puede deshacer.'))return;
+    if(!confirm('Última confirmación: borrar definitivamente a '+b.dataset.n+'.'))return;
+    await llamaUsuarios({accion:'borrar',user_id:b.dataset.id});toast('Usuario borrado');await render()},
   bloqueaUsuario:async b=>{
     const bl=b.dataset.b==='1';
     if(!confirm((bl?'¿Bloquear a ':'¿Desbloquear a ')+b.dataset.n+'?'+(bl?' No podrá volver a entrar.':'')))return;
@@ -702,8 +707,8 @@ const forms={
     const email=f.email.value.trim(),password=f.password.value;
     if(S.authMode==='signup'){
       const {data,error}=await sb.auth.signUp({email,password});if(error)throw error;
-      if(!data.session){toast('Te mandamos un correo para confirmar tu cuenta. Después entra aquí.');$('#dlg').close();return}
-    }else{const {error}=await sb.auth.signInWithPassword({email,password});if(error)throw new Error('Correo o contraseña incorrectos')}
+      if(!data.session){$('#dlg').close();alert('Cuenta creada.\n\nANTES DE ENTRAR debes verificar tu correo: te enviamos un mensaje a '+email+' con un enlace. Ábrelo y toca el enlace. Si no lo ves, revisa Spam o Correo no deseado.\n\nDespués regresa aquí y entra con tu correo y contraseña.');return}
+    }else{const {error}=await sb.auth.signInWithPassword({email,password});if(error)throw new Error(/not confirmed/i.test(error.message)?'Falta verificar tu correo: abre el mensaje que te enviamos y toca el enlace. Revisa también Spam.':'Correo o contraseña incorrectos')}
     $('#dlg').close();f.reset();await refresh();
     if(S.pending&&S.chofer)await registrarInteres(S.pending);
     else if(S.pending&&!S.chofer){S.view='perfil';await render();toast('Completa tu perfil para registrarte en el viaje')}
