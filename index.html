@@ -90,6 +90,10 @@ main.wide{max-width:none}
     </div>
   </form>
 </dialog>
+<dialog id="dlgDoc" style="width:min(96vw,720px);max-height:92vh;padding:12px">
+  <div class="row sp" style="margin-bottom:10px"><button class="btn" type="button" data-act="cierraDoc">← Volver</button><a id="docAbre" class="btn sec sm" target="_blank" rel="noopener" style="text-decoration:none">Abrir aparte</a></div>
+  <div id="docCuerpo" style="overflow:auto;max-height:78vh;text-align:center"></div>
+</dialog>
 <dialog id="dlgMulti">
   <h3 id="mmTitle" style="margin:0 0 10px"></h3>
   <div id="mmBody" class="checks"></div>
@@ -98,7 +102,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 10 nov 2026 · 23:30</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 10 nov 2026 · 23:45</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -636,7 +640,12 @@ const acts={
     const v=b.dataset.v==='1';
     const r=await sb.from('chofer_documentos').update({verificado:v,verificado_en:v?new Date().toISOString():null}).eq('chofer_id',b.dataset.chofer).eq('tipo',b.dataset.tipo);
     if(r.error)throw r.error;toast(v?'Documento verificado':'Check quitado: el chofer ya puede cambiarlo');S.docsOpen=b.dataset.chofer;await render()},
-  verDoc:async b=>{const u=await sb.storage.from('documentos').createSignedUrl(b.dataset.ruta,300);if(u.error)throw u.error;window.open(u.data.signedUrl,'_blank')},
+  verDoc:async b=>{const u=await sb.storage.from('documentos').createSignedUrl(b.dataset.ruta,300);if(u.error)throw u.error;
+    const url=u.data.signedUrl,pdf=/\.pdf$/i.test(b.dataset.ruta);
+    $('#docAbre').href=url;
+    $('#docCuerpo').innerHTML=pdf?`<iframe src="${url}" style="width:100%;height:76vh;border:0" title="Documento"></iframe>`:`<img src="${url}" alt="Documento" style="max-width:100%;height:auto;border-radius:8px">`;
+    $('#dlgDoc').showModal()},
+  cierraDoc:()=>{$('#dlgDoc').close();$('#docCuerpo').innerHTML=''},
   actualizar:async()=>{try{if(window.caches){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}}catch(e){}location.replace(location.pathname+'?v='+Date.now())},
   quitaInteres:async b=>{
     if(!confirm('¿Quitar tu interés en este viaje?'))return;
