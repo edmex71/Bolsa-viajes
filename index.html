@@ -98,7 +98,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 2 nov 2026 · 19:15</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 10 nov 2026 · 22:10</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -259,7 +259,7 @@ async function render(){
   const sn=$('#subnav');
   if(S.view==='admin'&&S.admin){
     sn.hidden=false;
-    sn.innerHTML=[['resumen','Resumen'],['tabla','Tabla'],['publicar','Publicar viaje'],['viajes','Viajes y precios'],['choferes','Choferes']].map(t=>`<button class="${S.sub===t[0]?'on':''}" data-act="sub" data-v="${t[0]}">${t[1]}</button>`).join('');
+    sn.innerHTML=[['resumen','Resumen'],['tabla','Tabla'],['publicar','Publicar viaje'],['viajes','Viajes y precios'],['choferes','Choferes'],['admins','Administradores']].map(t=>`<button class="${S.sub===t[0]?'on':''}" data-act="sub" data-v="${t[0]}">${t[1]}</button>`).join('');
   }else sn.hidden=true;
   const app=$('#app');app.classList.toggle('wide',S.view==='admin'&&S.sub==='tabla');
   try{
@@ -329,6 +329,7 @@ async function vistaAdmin(){
   if(S.sub==='tabla')return await vistaTabla();
   if(S.sub==='publicar')return formViaje();
   if(S.sub==='choferes')return await vistaChoferes();
+  if(S.sub==='admins')return await vistaAdmins();
   const data=await datosAdmin();
   if(S.sub==='viajes')return listaAdmin(S.soloViaje?data.filter(v=>v.id===S.soloViaje):data);
   return await resumen(data);
@@ -413,6 +414,11 @@ function listaAdmin(data){
     ['Cancelados',data.filter(v=>v.estado==='cancelado')]
   ].filter(g=>g[1].length);
   return grupos.map(g=>`<h2>${g[0]} (${g[1].length})</h2>`+g[1].map(card).join('')).join('');
+}
+async function vistaAdmins(){
+  const r=await sb.from('admins').select('user_id,nombre,correo,created_at').order('created_at');if(r.error)throw r.error;
+  const lista=(r.data||[]).map(a=>`<div class="card"><div class="row sp"><div><b>${esc(a.nombre||'')}</b><div class="mut">${esc(a.correo||'')}</div></div>${a.user_id===S.user.id?'<span class="badge ok">Tú</span>':`<button type="button" class="btn sec sm" data-act="quitaAdmin" data-id="${a.user_id}" data-n="${esc(a.correo||a.nombre||'')}">Quitar</button>`}</div></div>`).join('');
+  return `<div class="card"><h3>Agregar administrador</h3><form data-form="addAdmin"><p class="mut">La persona debe registrarse primero en la página con su correo. Después escribe aquí ese mismo correo.</p><label>Correo</label><input name="correo" type="email" required placeholder="correo@ejemplo.com"><div style="height:12px"></div><button class="btn full" type="submit">Hacer administrador</button></form></div><h2>Administradores (${(r.data||[]).length})</h2>${lista}`;
 }
 async function vistaChoferes(){
   const {data,error}=await sb.from('choferes').select('*, choferes_admin(*), chofer_documentos(tipo,ruta,nombre_archivo), interesados(id,estado,viaje:viajes(origen_ciudad,destino_ciudad,fecha_carga,estado))').order('created_at',{ascending:false});
@@ -613,6 +619,10 @@ const acts={
     if(d.error)throw d.error;
     if(!d.data||!d.data.length){toast('Este viaje ya está en revisión o aprobado. Contacta al administrador.',true);return}
     S.mine.delete(b.dataset.id);toast('Listo, quitamos tu interés');await render()},
+  quitaAdmin:async b=>{
+    if(!confirm('¿Quitar el acceso de administrador a '+(b.dataset.n||'esta persona')+'?'))return;
+    const d=await sb.rpc('admin_quitar',{p_user:b.dataset.id});if(d.error)throw d.error;
+    toast('Administrador quitado');await render()},
   quitaInt:async b=>{
     if(!confirm('¿Quitar a este chofer de este viaje?'))return;
     const d=await sb.from('interesados').delete().eq('id',b.dataset.id);if(d.error)throw d.error;
@@ -662,6 +672,9 @@ function datosChofer(f){
     seguro_vence:nn(g('seguro_vence')),aseguradora:nn(g('aseguradora')),poliza:nn(g('poliza')),expediente_medico:nn(g('expediente_medico')),medico_vence:nn(g('medico_vence')),banco:nn(g('banco')),titular:nn(g('titular')),clabe};
 }
 const forms={
+  addAdmin:async f=>{
+    const d=await sb.rpc('admin_agregar',{p_correo:f.correo.value.trim()});if(d.error)throw d.error;
+    toast('Ahora es administrador: '+d.data);await render()},
   auth:async f=>{
     const email=f.email.value.trim(),password=f.password.value;
     if(S.authMode==='signup'){
