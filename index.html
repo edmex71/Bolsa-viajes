@@ -98,7 +98,7 @@ main.wide{max-width:none}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 10 nov 2026 · 23:10</div>
+<div id="ver" style="text-align:center;font-size:12px;color:#98a2b3;padding:18px 0 28px">Versión: 10 nov 2026 · 23:30</div>
 <script>
 const SUPABASE_URL='https://rbhokfcdxqlhhujpidga.supabase.co';
 const SUPABASE_KEY='sb_publishable_TvnGwCubHemRrEcebe49iw_j9PDArBP';
@@ -146,10 +146,15 @@ const docsOpc=c=>DOCS_OPC;
 const docsReq=c=>['licencia','ine','tc_unidad','seguro'].concat((c&&c.unidades||[]).includes('Tracto')?['tc_caja']:[]);
 const docsMap=l=>Object.fromEntries((l||[]).map(d=>[d.tipo,d]));
 function docsHtml(c,map){
-  const fila=(t,req,oculta)=>{const d=map[t];return `<div data-doc-row="${t}" data-chofer-id="${c.id}" ${oculta?'hidden':''} style="padding:10px 0;border-top:1px solid #e4e7ec"><div class="row sp"><b>${esc(DOCS[t])}</b><span class="badge ${d?'ok':(req?'warn':'')}">${d?'Subido':(req?'Falta':(t==='tc_caja'?'Solo si es tracto':'Opcional'))}</span></div>
+  const adm=S.view==='admin'&&S.admin;
+  const fila=(t,req,oculta)=>{const d=map[t];const ver=!!(d&&d.verificado);
+  const badge=ver?'<span class="badge ok">✓ Verificado</span>':`<span class="badge ${d?'ok':(req?'warn':'')}">${d?'Subido':(req?'Falta':(t==='tc_caja'?'Solo si es tracto':'Opcional'))}</span>`;
+  const bloqueado=ver&&!adm;
+  return `<div data-doc-row="${t}" data-chofer-id="${c.id}" ${oculta?'hidden':''} style="padding:10px 0;border-top:1px solid #e4e7ec"><div class="row sp"><b>${esc(DOCS[t])}</b>${badge}</div>
   <div class="row" style="margin-top:8px;flex-wrap:wrap;gap:8px">${d?`<button type="button" class="btn sec sm" data-act="verDoc" data-ruta="${esc(d.ruta)}">Ver</button>`:''}
-  <label class="btn sec sm" style="cursor:pointer">📷 Tomar foto<input type="file" hidden accept="image/*" capture="environment" data-doc="${t}" data-chofer="${c.id}"></label>
-  <label class="btn sec sm" style="cursor:pointer">📄 Subir foto o PDF<input type="file" hidden accept="image/*,application/pdf" data-doc="${t}" data-chofer="${c.id}"></label></div></div>`};
+  ${adm&&d?`<button type="button" class="btn ${ver?'':'sec '}sm" data-act="checkDoc" data-chofer="${c.id}" data-tipo="${t}" data-v="${ver?0:1}">${ver?'✓ Verificado · quitar check':'☐ Verificar documento'}</button>`:''}
+  ${bloqueado?'<span class="mut">Verificado por el administrador: ya no se puede cambiar.</span>':`<label class="btn sec sm" style="cursor:pointer">📷 Tomar foto<input type="file" hidden accept="image/*" capture="environment" data-doc="${t}" data-chofer="${c.id}"></label>
+  <label class="btn sec sm" style="cursor:pointer">📄 Subir foto o PDF<input type="file" hidden accept="image/*,application/pdf" data-doc="${t}" data-chofer="${c.id}"></label>`}</div></div>`};
   const esTracto=(c.unidades||[]).includes('Tracto');
   return docsReq(c).map(t=>fila(t,true)).join('')+(esTracto?'':fila('tc_caja',true,true))+docsOpc(c).map(t=>fila(t,false)).join('');
 }
@@ -172,10 +177,10 @@ async function subeDoc(inp){
     const ext=esPdf?'pdf':'jpg',ruta=`${cid}/${tipo}.${ext}`;
     const up=await sb.storage.from('documentos').upload(ruta,blob,{upsert:true,contentType:esPdf?'application/pdf':(blob.type||'image/jpeg')});if(up.error)throw up.error;
     const ant=await sb.from('chofer_documentos').select('ruta').eq('chofer_id',cid).eq('tipo',tipo).maybeSingle();
-    const r=await sb.from('chofer_documentos').upsert({chofer_id:cid,tipo,ruta,nombre_archivo:file.name},{onConflict:'chofer_id,tipo'});if(r.error)throw r.error;
+    const r=await sb.from('chofer_documentos').upsert({chofer_id:cid,tipo,ruta,nombre_archivo:file.name,verificado:false,verificado_en:null},{onConflict:'chofer_id,tipo'});if(r.error)throw r.error;
     if(ant.data&&ant.data.ruta&&ant.data.ruta!==ruta)await sb.storage.from('documentos').remove([ant.data.ruta]);
     toast('Documento guardado');
-    if(S.chofer&&S.chofer.id===cid){const d=await sb.from('chofer_documentos').select('tipo,ruta,nombre_archivo').eq('chofer_id',cid);S.misDocs=docsMap(d.data)}
+    if(S.chofer&&S.chofer.id===cid){const d=await sb.from('chofer_documentos').select('tipo,ruta,nombre_archivo,verificado').eq('chofer_id',cid);S.misDocs=docsMap(d.data)}
     await render();
   }catch(e){toast(e.message||'No se pudo subir',true)}
 }
@@ -242,7 +247,7 @@ async function refresh(){
     S.admin=!!a.data;S.superAdmin=!!(a.data&&a.data.es_super);
     const c=await sb.from('choferes').select('*').eq('user_id',S.user.id).maybeSingle();
     S.chofer=c.data||null;
-    if(S.chofer){const i=await sb.from('interesados').select('viaje_id').eq('chofer_id',S.chofer.id);S.mine=new Set((i.data||[]).map(x=>x.viaje_id));const dd=await sb.from('chofer_documentos').select('tipo,ruta,nombre_archivo').eq('chofer_id',S.chofer.id);S.misDocs=docsMap(dd.data)}
+    if(S.chofer){const i=await sb.from('interesados').select('viaje_id').eq('chofer_id',S.chofer.id);S.mine=new Set((i.data||[]).map(x=>x.viaje_id));const dd=await sb.from('chofer_documentos').select('tipo,ruta,nombre_archivo,verificado').eq('chofer_id',S.chofer.id);S.misDocs=docsMap(dd.data)}
   }
   await cargarViajes();
   await render();
@@ -437,7 +442,7 @@ async function vistaAdmins(){
   return `<p class="mut">Solo tú, como administrador principal, ves esta sección. Aquí das o quitas el acceso de administrador, cambias contraseñas, bloqueas y borras usuarios.</p><h2>Usuarios (${us.length})</h2>${lista||'<p class="empty">Sin usuarios.</p>'}`;
 }
 async function vistaChoferes(){
-  const {data,error}=await sb.from('choferes').select('*, choferes_admin(*), chofer_documentos(tipo,ruta,nombre_archivo), interesados(id,estado,viaje:viajes(origen_ciudad,destino_ciudad,fecha_carga,estado))').order('created_at',{ascending:false});
+  const {data,error}=await sb.from('choferes').select('*, choferes_admin(*), chofer_documentos(tipo,ruta,nombre_archivo,verificado), interesados(id,estado,viaje:viajes(origen_ciudad,destino_ciudad,fecha_carga,estado))').order('created_at',{ascending:false});
   if(error)throw error;
   const q=S.q.toLowerCase();
   const list=(data||[]).filter(c=>!q||(c.nombre+' '+c.licencia_federal+' '+c.telefono).toLowerCase().includes(q));
@@ -456,7 +461,7 @@ async function vistaChoferes(){
     <div class="row" style="margin-top:8px"><select data-chg="verif" data-id="${c.id}" style="width:auto">${['pendiente','verificado','rechazado'].map(e=>`<option ${a.verificacion===e?'selected':''}>${e}</option>`).join('')}</select>
     <span class="mut">${a.verificado_en?'Verificado el '+esc(a.verificado_en):''}</span></div>
     ${(()=>{const f=faltaChofer(c);return f.length?`<div style="margin-top:8px"><span class="badge warn">Faltan ${f.length}</span><div class="tags" style="margin-top:6px">${f.map(x=>`<span class="tag" style="background:#fff4d6;color:#5c4300">${esc(x)}</span>`).join('')}</div></div>`:'<div style="margin-top:8px"><span class="badge ok">Datos completos</span></div>'})()}
-    <details style="margin-top:10px" ${S.editChofer===c.id?'open':''}><summary><b>Documentos</b> (${docsReq(c).filter(t=>docsMap(c.chofer_documentos)[t]).length}/${docsReq(c).length} requeridos)</summary>${docsHtml(c,docsMap(c.chofer_documentos))}</details>
+    <details style="margin-top:10px" ${S.editChofer===c.id||S.docsOpen===c.id?'open':''}><summary><b>Documentos</b> (${docsReq(c).filter(t=>docsMap(c.chofer_documentos)[t]).length}/${docsReq(c).length} requeridos)</summary>${docsHtml(c,docsMap(c.chofer_documentos))}</details>
     <div class="mut" style="margin-top:8px"><b>Viajes que eligió:</b></div>
     ${(c.interesados||[]).length?(c.interesados||[]).map(i=>{const w=i.viaje||{};return `<div class="mut">• ${esc((w.origen_ciudad||'?')+' → '+(w.destino_ciudad||'—'))} · ${esc(fmtFecha(w.fecha_carga))} · <b>${esc(EST_INT[i.estado]||i.estado)}</b></div>`}).join(''):'<div class="mut">Ninguno todavía.</div>'}
     <label>Notas tuyas (el chofer no las ve)</label><textarea data-notas="${c.id}">${esc(a.notas||'')}</textarea>
@@ -627,6 +632,10 @@ const acts={
   editChofer:async b=>{S.editChofer=S.editChofer===b.dataset.id?null:b.dataset.id;await render()},
   sub:async b=>{S.back=null;S.soloViaje=null;S.sub=b.dataset.v;await render()},
   interes:b=>registrarInteres(b.dataset.id),
+  checkDoc:async b=>{
+    const v=b.dataset.v==='1';
+    const r=await sb.from('chofer_documentos').update({verificado:v,verificado_en:v?new Date().toISOString():null}).eq('chofer_id',b.dataset.chofer).eq('tipo',b.dataset.tipo);
+    if(r.error)throw r.error;toast(v?'Documento verificado':'Check quitado: el chofer ya puede cambiarlo');S.docsOpen=b.dataset.chofer;await render()},
   verDoc:async b=>{const u=await sb.storage.from('documentos').createSignedUrl(b.dataset.ruta,300);if(u.error)throw u.error;window.open(u.data.signedUrl,'_blank')},
   actualizar:async()=>{try{if(window.caches){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}}catch(e){}location.replace(location.pathname+'?v='+Date.now())},
   quitaInteres:async b=>{
